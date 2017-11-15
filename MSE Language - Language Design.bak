@@ -41,7 +41,7 @@
 
 
 
-;; for desugar
+
 (define-type MSE
   [num (n number?)]
   [id (name symbol?)]
@@ -57,20 +57,6 @@
   [markov (seed MSE?) (length num?) (initial-note MSE?)] ; initial-note has to evaluate to a note
   )
 
-;; for interpreter
-;; exclude seq-append and with
-(define-type D-MSE
-  [i-num (n number?)]
-  [i-id (name symbol?)]
-  [i-note (pitch num?) (vel num?) (dur num?)]
-  [i-sequence (values (listof note?))]
-  [i-fun (param symbol?) (body D-MSE?)]
-  [i-app (function D-MSE?) (arg D-MSE?)]
-  [i-interleave (list1 D-MSE?) (list2 D-MSE?)]
-  [i-insert (list1 D-MSE?)(list2 D-MSE?)(index num?)]
-  [i-transpose (list1 D-MSE?)(add-val num?)]
-  [i-markov (seed D-MSE?)(length num?)(initial-note D-MSE?)]
-  )
 
 (define (parse sexp)
   (match sexp
@@ -130,78 +116,5 @@
     [fun (param body) (fun param (desugar body))]
     [app (fn-exp arg-exp) (app (desugar fn-exp)
                                (desugar arg-exp))]
-    [interleave (lst1 lst2)
-                (interleave (desugar lst1)(desugar lst2))]
-    [insert (lst1 lst2 index)
-            (insert (desugar lst1)(desugar lst2)(desugar index))]
-    [transpose (lst1 anum)
-               (transpose (desugar lst1)(desugar anum))]
-    [markov (s lth ini)
-            (markov (desugar s)(desugar lth)(desugar ini))]
-    ))
+    [else "NO!!!"]))
 
-;; test cases
-
-;; sequence
-(test (desugar (parse '{sequence {note 40 50 60}}))
-      (sequence (list (note (num 40) (num 50) (num 60)))))
-(test (desugar (parse '{sequence {note 40 50 60}
-                                 {note 50 60 70}}))
-      (sequence (list (note (num 40) (num 50) (num 60))
-                      (note (num 50) (num 60) (num 70)))))
-;; seq-append
-(test (desugar (parse '{seq-append
-                        {sequence {note 30 40 50}
-                                  {note 20 30 40}}
-                        {sequence {note 40 50 60}}}))
-      (insert
-       (sequence
-         (list (note (num 30) (num 40) (num 50))
-               (note (num 20) (num 30) (num 40))))
-       (sequence (list (note (num 40) (num 50) (num 60))))
-       (num 2)))
-
-;; with
-(test (desugar (parse '{with {c
-                              {sequence {note 10 20 30}}}
-                             c}))
-      (app (fun 'c (id 'c))
-           (sequence (list (note (num 10) (num 20) (num 30))))))
-;; interleave
-(test (desugar (parse '{interleave {sequence {note 30 40 50}}
-                                   {sequence {note 40 50 60}}}))
-      (interleave
-       (sequence (list (note (num 30) (num 40) (num 50))))
-       (sequence (list (note (num 40) (num 50) (num 60))))))
-;; insert
-(test (desugar (parse '{insert {sequence {note 20 30 40}}
-                               {sequence {note 30 40 50}
-                                         {note 40 50 60}
-                                         {note 10 20 30}}
-                               2}))
-      (insert
-       (sequence (list (note (num 20) (num 30) (num 40))))
-       (sequence
-         (list
-          (note (num 30) (num 40) (num 50))
-          (note (num 40) (num 50) (num 60))
-          (note (num 10) (num 20) (num 30))))
-       (num 2)))
-;; transpose
-(test (desugar (parse '{transpose {sequence {note 30 40 50}} 14}))
-      (transpose (sequence (list (note (num 30) (num 40) (num 50)))) (num 14)))
-;; markov
-(test  (desugar (parse '{markov
-                         {sequence {note 20 30 40}
-                                   {note 30 40 50}
-                                   {note 40 50 60}}
-                         20
-                         {sequence {note 20 30 40}}}))
-       (markov
-        (sequence
-          (list
-           (note (num 20) (num 30) (num 40))
-           (note (num 30) (num 40) (num 50))
-           (note (num 40) (num 50) (num 60))))
-        (num 20)
-        (sequence (list (note (num 20) (num 30) (num 40))))))
