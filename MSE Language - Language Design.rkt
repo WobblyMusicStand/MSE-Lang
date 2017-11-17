@@ -241,22 +241,22 @@
                                     (inter (rest lis1) (rest lis2))))]))
           ;(define (markov lis 
           (define (helper expr env)
-            (type-case MSE expr
-              [num (n) n]
-              [note (p v d) (noteV (pitchV p)
+            (type-case D-MSE expr
+              [i-num (n) n]
+              [i-note (p v d) (noteV (pitchV p)
                                    (velV v)
                                    (durV d))]
-              [id  (name)  (lookup name env)]
-              [sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
-              [fun (arg-name body) (closureV arg-name body env)]
-              [app (fun-expr arg-expr)
+              [i-id  (name)  (lookup name env)]
+              [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
+              [i-fun (arg-name body) (closureV arg-name body env)]
+              [i-app (fun-expr arg-expr)
                    (local ([define fun-val (helper fun-expr env)]
                            [define arg-val (helper arg-expr env)])
                      (helper (closureV-body fun-val)
                              (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
-              [insert (l1 l2 index) (helper (sequence (doInsert (tolist (helper l1 env)) (tolist (helper l2 env)) (helper index env))) env)]
-              [transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
-              [interleave (l1 l2) (helper (sequence (inter (tolist l1) (tolist l2))) env)]
+              [i-interleave (l1 l2) (helper (sequence (inter (tolist l1) (tolist l2))) env)]
+              [i-insert (l1 l2 index) (helper (sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
+              [i-transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
 
