@@ -233,6 +233,12 @@
             (type-case MSE seq
               [sequence (l) l]
               [else (error "need a sequence")]))
+          (define (inter lis1 lis2)
+            (cond [(empty? lis1) lis2]
+                  [(empty? lis2) lis1]
+                  [else (cons (first lis1)
+                              (cons (first lis2)
+                                    (inter (rest lis1) (rest lis2))))]))
           ;(define (markov lis 
           (define (helper expr env)
             (type-case MSE expr
@@ -250,5 +256,36 @@
                              (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
               [insert (l1 l2 index) (helper (sequence (doInsert (tolist (helper l1 env)) (tolist (helper l2 env)) (helper index env))) env)]
               [transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
+              [interleave (l1 l2) (helper (sequence (inter (tolist l1) (tolist l2))) env)]
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
+
+(define (run mse)
+  (interp (desugar (parse mse))))
+
+;; test cases
+
+(test (run '{with {c {sequence {note 10 20 30}}}
+                             c})
+      (seqV (list (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30))))))
+
+(test (run '(interleave (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
+(seqV
+ (list
+  (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
+  (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
+  (noteV (pitchV (num 20)) (velV (num 20)) (durV (num 20)))
+  (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30))))))
+
+(test (run '(interleave (sequence (note 10 20 30)) (sequence (note 30 20 10) (note 30 30 30))))
+(seqV (list (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
+            (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
+            (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30))))))
+
+(test (run '(seq-append (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
+(seqV
+ (list
+  (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
+  (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30)))
+  (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
+  (noteV (pitchV (num 20)) (velV (num 20)) (durV (num 20))))))
