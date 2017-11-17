@@ -205,3 +205,50 @@
            (note (num 40) (num 50) (num 60))))
         (num 20)
         (sequence (list (note (num 20) (num 30) (num 40))))))
+        
+(define (lookup name env)
+  (local ([define (lookup-helper name env)
+            (type-case Env env
+              [mtEnv () (error 'lookup "free identifier ~a" name)]
+              [anEnv (bound-name bound-value rest-env)
+                     (if (symbol=? bound-name name)
+                         bound-value
+                         (lookup-helper name rest-env))])])
+    (lookup-helper name env)))
+
+(define (interp d-mse)
+  (local [(define (transOne val m env)
+            (type-case MSE m
+              [note (p v d)  (note (num (+ (helper val env) (helper p env))) v d)]
+              [else (transOne val
+                              (type-case MSE-Value (helper m env)
+                                [noteV (p v d) (note p v d)]
+                                [else "need a note"]) env)]))
+          (define (doInsert lis2 lis n)
+            (cond [(> n (length lis)) (append lis lis2)]
+                  [(= n 0)(append lis2 lis)]
+                  [else
+                   (cons (first lis) (doInsert lis2 (rest lis) (sub1 n)))]))
+          (define (tolist seq)
+            (type-case MSE seq
+              [sequence (l) l]
+              [else (error "need a sequence")]))
+          ;(define (markov lis 
+          (define (helper expr env)
+            (type-case MSE expr
+              [num (n) n]
+              [note (p v d) (noteV (pitchV p)
+                                   (velV v)
+                                   (durV d))]
+              [id  (name)  (lookup name env)]
+              [sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
+              [fun (arg-name body) (closureV arg-name body env)]
+              [app (fun-expr arg-expr)
+                   (local ([define fun-val (helper fun-expr env)]
+                           [define arg-val (helper arg-expr env)])
+                     (helper (closureV-body fun-val)
+                             (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
+              [insert (l1 l2 index) (helper (sequence (doInsert (tolist (helper l1 env)) (tolist (helper l2 env)) (helper index env))) env)]
+              [transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
+              [else "NO!!!"]))]
+    (helper d-mse (mtEnv))))
