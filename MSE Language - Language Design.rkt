@@ -47,6 +47,7 @@
   [id (name symbol?)]
   [note (pitch num?) (vel num?) (dur num?)] ; Pitch, Velocity, Duration
   [sequence (values (listof note?))]                  ; Distributions must not be empty and strictly evaluate to a (listof Note)
+  [seqn-p (values (listof MSE?))]
   [seq-append (list1 MSE?) (list2 MSE?)]              
   [with (id symbol?) (expr MSE?) (body MSE?)]
   [fun (param symbol?) (body MSE?)]
@@ -78,6 +79,7 @@
     [(? symbol?) (id sexp)]
     [(list 'note pitch vel dur) (note (parse pitch) (parse vel) (parse dur))]
     [(cons 'sequence notes) (sequence (map parse notes))]
+    [(cons 'seqn-p notes) (seqn-p  (map parse notes))]
     [(list 'seq-append list1 list2) (seq-append (parse list1) (parse list2))]
     [(list 'with (list (? valid-id? id) value) body) (with id (parse value) (parse body))]
     [(list 'fun (? valid-id? param) body) (fun param (parse body))]
@@ -122,6 +124,7 @@
                         (desugar v)
                         (desugar d))]
     [sequence (vals) (sequence (map desugar vals))]
+    [seqn-p (vals) (seqn-p (map desugar vals))]
     [seq-append (seq1 seq2)
                 (insert (desugar seq1)
                         (desugar seq2)
@@ -206,6 +209,27 @@
         (num 20)
         (sequence (list (note (num 20) (num 30) (num 40))))))
         
+(define (decode-pitch sym)
+  (match sym
+    ;[(? number?) (num sym)]
+    [(? symbol?) (match (symbol->string sym)
+                   [(regexp #rx"[A-G](#|b)*[0-9]+$")(num (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
+                                                        ['("C") 0]
+                                                        ['("D") 2]
+                                                        ['("E") 4]
+                                                        ['("F") 5]
+                                                        ['("G") 7]
+                                                        ['("A") 9]
+                                                        ['("B") 11])
+                                                      (match (regexp-match #rx"b|#" (symbol->string sym))
+                                                        ['("b") -1]
+                                                        ['("#") 1]
+                                                        [else 0])
+                                                      (* (string->number (first (regexp-match #rx"[0-9]+" (symbol->string sym)))) 12)))]
+                    [else (error "Not a valid pitch: " sym)])]
+    [else (error "Not a valid pitch: " sym)]
+    ))
+        
 (define (lookup name env)
   (local ([define (lookup-helper name env)
             (type-case Env env
@@ -213,8 +237,14 @@
               [anEnv (bound-name bound-value rest-env)
                      (if (symbol=? bound-name name)
                          bound-value
-                         (lookup-helper name rest-env))])])
-    (lookup-helper name env)))
+                         (lookup-helper name rest-env))])]
+          [define (pitch-check name)
+            (match (symbol->string name)
+                   [(regexp #rx"[A-G](#|b)*[0-9]+$") true]
+                   [else false])])
+    (if (pitch-check name)
+        (decode-pitch name) 
+        (lookup-helper name env))))
 
 (define (interp d-mse)
   (local [(define (transOne val m env)
@@ -242,21 +272,24 @@
           ;(define (markov lis 
           (define (helper expr env)
             (type-case D-MSE expr
-              [i-num (n) n]
-              [i-note (p v d) (noteV (pitchV p)
+              [num (n) n]
+              [note (p v d) (noteV (pitchV p)
                                    (velV v)
                                    (durV d))]
-              [i-id  (name)  (lookup name env)]
-              [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
-              [i-fun (arg-name body) (closureV arg-name body env)]
-              [i-app (fun-expr arg-expr)
+              [id  (name)  (lookup name env)]
+              [sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
+              [seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
+                                                           (velV (num 10))
+                                                           (durV (num 10)))) syms))]
+              [fun (arg-name body) (closureV arg-name body env)]
+              [app (fun-expr arg-expr)
                    (local ([define fun-val (helper fun-expr env)]
                            [define arg-val (helper arg-expr env)])
                      (helper (closureV-body fun-val)
                              (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
-              [i-interleave (l1 l2) (helper (sequence (inter (tolist l1) (tolist l2))) env)]
-              [i-insert (l1 l2 index) (helper (sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
-              [i-transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
+              [interleave (l1 l2) (helper (sequence (inter (tolist l1) (tolist l2))) env)]
+              [insert (l1 l2 index) (helper (sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
+              [transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
 
