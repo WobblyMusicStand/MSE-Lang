@@ -271,7 +271,7 @@
                                     (inter (rest lis1) (rest lis2))))]))
           ;(define (markov lis 
           (define (helper expr env)
-            (type-case D-MSE expr
+            (type-case MSE expr
               [num (n) n]
               [note (p v d) (noteV (pitchV p)
                                    (velV v)
