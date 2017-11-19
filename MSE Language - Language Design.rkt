@@ -23,6 +23,7 @@
 ;;     | <id>
 ;;     | {note <num> <num> <num>}
 ;;     | {sequence <MSE>*}
+;;     | {seqn-p <MSE>*}                            ; A list of given notes in letter format (e.g. A4 E5)
 ;;     | {seq-append <MSE> to <MSE>}                ; Appends the 2nd MSE Expression to
 ;;                                                    the end of the first
 ;;     | {with {<id> <MSE>} <MSE>}     
