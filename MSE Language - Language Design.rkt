@@ -1,5 +1,7 @@
 #lang plai
 
+;(print-only-errors)
+
 
 ;; ==========================================================
 ;;                     EBNF & DEFINE-TYPES
@@ -21,14 +23,14 @@
 ;;
 ;; <MSE> ::= <num>
 ;;     | <id>
-;;     | {note <num> <num> <num>}
+;;     | {note <MSE> <MSE> <MSE>}                ;Notes can take either numbers, or ids for their values
 ;;     | {sequence <MSE>*}
-;;     | {seq-append <MSE> to <MSE>}                ; Appends the 2nd MSE Expression to
+;;     | {seq-append <MSE> to <MSE>}             ; Appends the 2nd MSE Expression to
 ;;                                                    the end of the first
 ;;     | {with {<id> <MSE>} <MSE>}     
 ;;     | {fun {<id> <MSE>} <MSE>}
-;;     | {<MSE> <MSE> }                             ; function calls, any time the first symbol is not a reserved word
-;;     | {interleave <MSE> into <MSE>}              ; Takes first element of 1st MSE, appends to 1st element of 2nd MSE ... 
+;;     | {<MSE> <MSE> }                          ; function calls, any time the first symbol is not a reserved word
+;;     | {interleave <MSE> into <MSE>}           ; Takes first element of 1st MSE, appends to 1st element of 2nd MSE ... 
 ;;     | {insert <MSE> in <MSE> at <num>}        ; Inserts MSE in MSE at index number
 ;;     | {transpose <MSE> <num>}                 ; Takes a sequence of notes and a number, and
 ;;                                                    adds that number to the pitch of all notes in the sequence
@@ -41,11 +43,13 @@
 
 
 
+
+
 ;; for desugar
 (define-type MSE
   [num (n number?)]
   [id (name symbol?)]
-  [note (pitch num?) (vel num?) (dur num?)] ; Pitch, Velocity, Duration
+  [note (pitch MSE?) (vel MSE?) (dur MSE?)] ; Pitch, Velocity, Duration
   [sequence (values (listof note?))]                  ; Distributions must not be empty and strictly evaluate to a (listof Note)
   [seqn-p (values (listof MSE?))]
   [seq-append (list1 MSE?) (list2 MSE?)]              
@@ -58,12 +62,30 @@
   [markov (seed MSE?) (length num?) (initial-note MSE?)] ; initial-note has to evaluate to a note
   )
 
+;; Environments store values, instead of substitutions
+(define-type Env
+  [mtEnv]
+  [anEnv (name symbol?) (value MSE-Value?) (env Env?)])
+
+;; Interpreting a value returns a Value
+(define-type MSE-Value
+  ; Sequence of  Notes
+  [numV (n number?)]        
+  [pitchV (pit number?)]
+  [velV (vel number?)]
+  [durV (dur number?)]
+  [noteV (p pitchV?) (vel velV?) (dur durV?)]
+  [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))] ;;Distributions must not be empty
+  [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
+            (body MSE?)
+            (env Env?)])
+
 ;; for interpreter
 ;; exclude seq-append and with
 (define-type D-MSE
   [i-num (n number?)]
   [i-id (name symbol?)]
-  [i-note (pitch num?) (vel num?) (dur num?)]
+  [i-note (pitch D-MSE?) (vel D-MSE?) (dur D-MSE?)]
   [i-sequence (values (listof note?))]
   [i-fun (param symbol?) (body D-MSE?)]
   [i-app (function D-MSE?) (arg D-MSE?)]
@@ -97,24 +119,9 @@
 ;; Returns whether the given input is a symbol and a valid identifier
 (define (valid-id? sym)
   (and (symbol? sym)
+       ;;TODO add pitch rejection
        (not (member sym *reserved-symbols*))))
 
-;; Environments store values, instead of substitutions
-(define-type Env
-  [mtEnv]
-  [anEnv (name symbol?) (value MSE-Value?) (env Env?)])
-
-;; Interpreting a value returns a Value
-(define-type MSE-Value
-  ; Sequence of  Notes
-  [pitchV (pit num?)]
-  [velV (vel num?)]
-  [durV (dur num?)]
-  [noteV (p pitchV?) (vel velV?) (dur durV?)]
-  [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))] ;;Distributions must not be empty
-  [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
-            (body MSE?)
-            (env Env?)])
 
 (define (desugar p-mse)
   (type-case MSE p-mse
@@ -143,8 +150,8 @@
             (markov (desugar s)(desugar lth)(desugar ini))]
     ))
 
-;; test cases
 
+;;  desugar test cases ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; sequence
 (test (desugar (parse '{sequence {note 40 50 60}}))
       (sequence (list (note (num 40) (num 50) (num 60)))))
@@ -208,12 +215,16 @@
            (note (num 40) (num 50) (num 60))))
         (num 20)
         (sequence (list (note (num 20) (num 30) (num 40))))))
-        
+
+
+
+;;Interp
+
+;;decode-pitch symbol -> number        
 (define (decode-pitch sym)
   (match sym
-    ;[(? number?) (num sym)]
     [(? symbol?) (match (symbol->string sym)
-                   [(regexp #rx"[A-G](#|b)*[0-9]+$")(num (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
+                   [(regexp #rx"[A-G](#|b)*[0-9]+$") (numV (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
                                                         ['("C") 0]
                                                         ['("D") 2]
                                                         ['("E") 4]
@@ -221,7 +232,7 @@
                                                         ['("G") 7]
                                                         ['("A") 9]
                                                         ['("B") 11])
-                                                      (match (regexp-match #rx"b|#" (symbol->string sym))
+                                                      (match (regexp-match #rx"b|#" (symbol->string sym)) ;;TODO, count quantity of sharp/flat
                                                         ['("b") -1]
                                                         ['("#") 1]
                                                         [else 0])
@@ -229,7 +240,8 @@
                     [else (error "Not a valid pitch: " sym)])]
     [else (error "Not a valid pitch: " sym)]
     ))
-        
+
+;;lookup symbol -> MSE
 (define (lookup name env)
   (local ([define (lookup-helper name env)
             (type-case Env env
@@ -272,10 +284,10 @@
           ;(define (markov lis 
           (define (helper expr env)
             (type-case MSE expr
-              [num (n) n]
-              [note (p v d) (noteV (pitchV p)
-                                   (velV v)
-                                   (durV d))]
+              [num (n) (numV n)]
+              [note (p v d) (noteV (pitchV (numV-n  (helper p env)))
+                                   (velV (numV-n  (helper v env)))
+                                   (durV (numV-n  (helper d env))))]
               [id  (name)  (lookup name env)]
               [sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
               [seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
@@ -288,7 +300,7 @@
                      (helper (closureV-body fun-val)
                              (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
               [interleave (l1 l2) (helper (sequence (inter (tolist l1) (tolist l2))) env)]
-              [insert (l1 l2 index) (helper (sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
+              [insert (l1 l2 index) (helper (sequence (doInsert (tolist  l1 ) (tolist  l2) (numV-n (helper index env)))) env)]
               [transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
@@ -296,29 +308,43 @@
 (define (run mse)
   (interp (desugar (parse mse))))
 
+
 ;; test cases
 
+(test (run '10) (numV 10))
+
+(test (run '{note 10 20 30})
+      (noteV (pitchV 10) (velV  20) (durV 30)))
+
+
+(test (run '{note C4 20 30})
+      (noteV (pitchV 48) (velV  20) (durV 30)))
+
+(test (run '{with {c 10} c}) (numV 10))
+
+(test/exn (run '{with {C4 10} C4}) "") ;restricted pitch identifier
+      
 (test (run '{with {c {sequence {note 10 20 30}}}
                              c})
-      (seqV (list (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30))))))
+      (seqV (list (noteV (pitchV 10) (velV 20) (durV  30)))))
 
 (test (run '(interleave (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
 (seqV
  (list
-  (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
-  (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
-  (noteV (pitchV (num 20)) (velV (num 20)) (durV (num 20)))
-  (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30))))))
+  (noteV (pitchV 10) (velV 20) (durV 30))
+  (noteV (pitchV 30) (velV 20) (durV 10))
+  (noteV (pitchV 20) (velV 20) (durV 20))
+  (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 (test (run '(interleave (sequence (note 10 20 30)) (sequence (note 30 20 10) (note 30 30 30))))
-(seqV (list (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
-            (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
-            (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30))))))
+(seqV (list (noteV (pitchV 10) (velV 20) (durV 30))
+            (noteV (pitchV 30) (velV 20) (durV 10))
+            (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 (test (run '(seq-append (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
 (seqV
  (list
-  (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
-  (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30)))
-  (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
-  (noteV (pitchV (num 20)) (velV (num 20)) (durV (num 20))))))
+  (noteV (pitchV 30) (velV 20) (durV 10))
+  (noteV (pitchV 30) (velV 30) (durV 30))
+  (noteV (pitchV 10) (velV 20) (durV 30))
+  (noteV (pitchV 20) (velV 20) (durV 20)))))
