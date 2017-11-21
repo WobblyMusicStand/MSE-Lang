@@ -329,25 +329,25 @@
 
 (test (run '{with {c {sequence {note 10 20 30}}}
                              c})
-      (seqV (list (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30))))))
+      (seqV (list (noteV (pitchV 10) (velV 20) (durV 30)))))
 
 (test (run '(interleave (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
 (seqV
  (list
-  (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
-  (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
-  (noteV (pitchV (num 20)) (velV (num 20)) (durV (num 20)))
-  (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30))))))
+  (noteV (pitchV 10) (velV 20) (durV 30))
+  (noteV (pitchV 30) (velV 20) (durV 10))
+  (noteV (pitchV 20) (velV 20) (durV 20))
+  (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 (test (run '(interleave (sequence (note 10 20 30)) (sequence (note 30 20 10) (note 30 30 30))))
-(seqV (list (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
-            (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
-            (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30))))))
+(seqV (list (noteV (pitchV 10) (velV 20) (durV 30))
+            (noteV (pitchV 30) (velV 20) (durV 10))
+            (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 (test (run '(seq-append (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
 (seqV
  (list
-  (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
-  (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30)))
-  (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
-  (noteV (pitchV (num 20)) (velV (num 20)) (durV (num 20))))))
+  (noteV (pitchV 30) (velV 20) (durV 10))
+  (noteV (pitchV 30) (velV 30) (durV 30))
+  (noteV (pitchV 10) (velV 20) (durV 30))
+  (noteV (pitchV 20) (velV 20) (durV 20)))))
