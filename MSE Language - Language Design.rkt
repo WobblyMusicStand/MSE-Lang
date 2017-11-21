@@ -66,14 +66,15 @@
   [i-num (n number?)]
   [i-id (name symbol?)]
   [i-note (pitch D-MSE?) (vel D-MSE?) (dur D-MSE?)]
-  [i-sequence (values (listof note?))]
+  [i-sequence (values (listof i-note?))]
+  [i-seqn-p (values (listof D-MSE?))]
   [i-fun (param symbol?) (body D-MSE?)]
   [i-app (function D-MSE?) (arg D-MSE?)]
   [i-interleave (list1 D-MSE?) (list2 D-MSE?)]
-  [i-insert (list1 D-MSE?)(list2 D-MSE?)(index num?)]
-  [i-transpose (list1 D-MSE?)(add-val num?)]
+  [i-insert (list1 D-MSE?)(list2 D-MSE?)(index i-num?)]
+  [i-transpose (list1 D-MSE?)(add-val i-num?)]
   [changeProp (list1 D-MSE?) (val i-num?) (pos i-num?)]
-  [i-markov (seed D-MSE?)(length num?)(initial-note D-MSE?)]
+  [i-markov (seed D-MSE?)(length i-num?)(initial-note D-MSE?)]
   )
 
 (define (parse sexp)
@@ -298,24 +299,24 @@
           ;(define (markov lis 
           (define (helper expr env)
             (type-case MSE expr
-              [num (n) n]
-              [note (p v d) (noteV (pitchV (helper p env))
+              [i-num (n) n]
+              [i-note (p v d) (noteV (pitchV (helper p env))
                                    (velV (helper v env) )
                                    (durV (helper d env)))]
-              [id  (name)  (lookup name env)]
-              [sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
-              [seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
+              [i-id  (name)  (lookup name env)]
+              [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
+              [i-seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
                                                            (velV (num 10))
                                                            (durV (num 10)))) syms))]
-              [fun (arg-name body) (closureV arg-name body env)]
-              [app (fun-expr arg-expr)
+              [i-fun (arg-name body) (closureV arg-name body env)]
+              [i-app (fun-expr arg-expr)
                    (local ([define fun-val (helper fun-expr env)]
                            [define arg-val (helper arg-expr env)])
                      (helper (closureV-body fun-val)
                              (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
-              [interleave (l1 l2) (helper (sequence (inter (tolist l1) (tolist l2))) env)]
-              [insert (l1 l2 index) (helper (sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
-              [transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
+              [i-interleave (l1 l2) (helper (i-sequence (inter (tolist l1) (tolist l2))) env)]
+              [i-insert (l1 l2 index) (helper (i-sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
+              [i-transpose (listN value)  (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
               [changeProp (listN value pos) (cond [(= 1 (helper pos env)) (helper (i-sequence (map (lambda (m) (changePit value m env)) (tolist listN))) env)]
                                                 [(= 2 (helper pos env)) (helper (i-sequence (map (lambda (m) (changeVol value m env)) (tolist listN))) env)]
                                                 [(= 3 (helper pos env)) (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env)])]
