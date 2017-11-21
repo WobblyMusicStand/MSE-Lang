@@ -254,7 +254,7 @@
 
 (define (interp d-mse)
   (local [(define (transOne val m env)
-            (type-case MSE m
+            (type-case D-MSE m
               [note (p v d)  (note (num (+ (helper val env) (helper p env))) v d)]
               [else (transOne val
                               (type-case MSE-Value (helper m env)
@@ -287,8 +287,8 @@
                   [else
                    (cons (first lis) (doInsert lis2 (rest lis) (sub1 n)))]))
           (define (tolist seq)
-            (type-case MSE seq
-              [sequence (l) l]
+            (type-case D-MSE seq
+              [i-sequence (l) l]
               [else (error "need a sequence")]))
           (define (inter lis1 lis2)
             (cond [(empty? lis1) lis2]
@@ -298,7 +298,7 @@
                                     (inter (rest lis1) (rest lis2))))]))
           ;(define (markov lis 
           (define (helper expr env)
-            (type-case MSE expr
+            (type-case D-MSE expr
               [i-num (n) n]
               [i-note (p v d) (noteV (pitchV (helper p env))
                                    (velV (helper v env) )
