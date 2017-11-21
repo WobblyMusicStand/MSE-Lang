@@ -255,10 +255,10 @@
 (define (interp d-mse)
   (local [(define (transOne val m env)
             (type-case D-MSE m
-              [note (p v d)  (note (num (+ (helper val env) (helper p env))) v d)]
+              [i-note (p v d)  (i-note (i-num (+ (helper val env) (helper p env))) v d)]
               [else (transOne val
                               (type-case MSE-Value (helper m env)
-                                [noteV (p v d) (note p v d)]
+                                [noteV (p v d) (i-note p v d)]
                                 [else "need a note"]) env)]))
           (define (changeVol val m env)
             (type-case D-MSE m
