@@ -56,6 +56,7 @@
   [interleave (list1 MSE?) (list2 MSE?)]
   [insert (list1 MSE?) (list2 MSE?) (index num?)]
   [transpose (list1 MSE?) (add-val num?)]
+  [changeVelocity (list1 MSE?) (val num?)]
   [markov (seed MSE?) (length num?) (initial-note MSE?)] ; initial-note has to evaluate to a note
   )
 
@@ -64,14 +65,16 @@
 (define-type D-MSE
   [i-num (n number?)]
   [i-id (name symbol?)]
-  [i-note (pitch num?) (vel num?) (dur num?)]
-  [i-sequence (values (listof note?))]
+  [i-note (pitch D-MSE?) (vel D-MSE?) (dur D-MSE?)]
+  [i-sequence (values (listof i-note?))]
+  [i-seqn-p (values (listof D-MSE?))]
   [i-fun (param symbol?) (body D-MSE?)]
   [i-app (function D-MSE?) (arg D-MSE?)]
   [i-interleave (list1 D-MSE?) (list2 D-MSE?)]
-  [i-insert (list1 D-MSE?)(list2 D-MSE?)(index num?)]
-  [i-transpose (list1 D-MSE?)(add-val num?)]
-  [i-markov (seed D-MSE?)(length num?)(initial-note D-MSE?)]
+  [i-insert (list1 D-MSE?)(list2 D-MSE?)(index i-num?)]
+  [i-transpose (list1 D-MSE?)(add-val i-num?)]
+  [changeProp (list1 D-MSE?) (val i-num?) (pos i-num?)]
+  [i-markov (seed D-MSE?)(length i-num?)(initial-note D-MSE?)]
   )
 
 (define (parse sexp)
@@ -89,6 +92,7 @@
     [(list 'interleave list1 list2) (interleave (parse list1) (parse list2))]
     [(list 'insert list1 list2 index) (insert (parse list1) (parse list2) (parse index))]
     [(list 'transpose list1 add-val) (transpose (parse list1) (parse add-val))]
+    [(list 'changeVelocity list1 val) (changeVelocity (parse list1) (parse val))]
     [(list 'markov seed length initial-note) (markov (parse seed) (parse length) (parse initial-note))]))
 
 
@@ -108,92 +112,138 @@
 ;; Interpreting a value returns a Value
 (define-type MSE-Value
   ; Sequence of  Notes
-  [pitchV (pit num?)]
-  [velV (vel num?)]
-  [durV (dur num?)]
+  [pitchV (pit number?)]
+  [velV (vel number?)]
+  [durV (dur number?)]
   [noteV (p pitchV?) (vel velV?) (dur durV?)]
   [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))] ;;Distributions must not be empty
   [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
-            (body MSE?)
+            (body D-MSE?)
             (env Env?)])
 
 (define (desugar p-mse)
   (type-case MSE p-mse
-    [num (n) (num n)]
-    [id (val) (id val)]
-    [note (p v d) (note (desugar p)
+   [num (n) (i-num n)]
+    [id (val) (i-id val)]
+    [note (p v d) (i-note (desugar p)
                         (desugar v)
                         (desugar d))]
-    [sequence (vals) (sequence (map desugar vals))]
-    [seqn-p (vals) (seqn-p (map desugar vals))]
+    [sequence (vals) (i-sequence (map desugar vals))]
+    [seqn-p (vals) (i-seqn-p (map desugar vals))]
     [seq-append (seq1 seq2)
-                (insert (desugar seq1)
+                (i-insert (desugar seq1)
                         (desugar seq2)
-                        (num (length (sequence-values (desugar seq1)))))] 
+                        (i-num (length (type-case MSE seq1
+                                         [sequence (s) (i-sequence-values (desugar seq1))]
+                                         [seqn-p (s) (i-seqn-p-values (desugar seq1))]
+                                         [else (error "need a sequence or seqn-p")]))))] 
     [with (id named-expr body) (desugar (app (fun id body) named-expr))]
-    [fun (param body) (fun param (desugar body))]
-    [app (fn-exp arg-exp) (app (desugar fn-exp)
+    [fun (param body) (i-fun param (desugar body))]
+    [app (fn-exp arg-exp) (i-app (desugar fn-exp)
                                (desugar arg-exp))]
     [interleave (lst1 lst2)
-                (interleave (desugar lst1)(desugar lst2))]
+                (i-interleave (desugar lst1)(desugar lst2))]
     [insert (lst1 lst2 index)
-            (insert (desugar lst1)(desugar lst2)(desugar index))]
-    [transpose (lst1 anum)
-               (transpose (desugar lst1)(desugar anum))]
+            (i-insert (desugar lst1)(desugar lst2)(desugar index))]
+    [transpose (lst1 anum )
+               (i-transpose (desugar lst1)(desugar anum))]
+    [changeVelocity (list1 val) (changeProp (desugar list1) (desugar val) (i-num 2))]
     [markov (s lth ini)
-            (markov (desugar s)(desugar lth)(desugar ini))]
+            (i-markov (desugar s)(desugar lth)(desugar ini))]
     ))
 
 ;; test cases
 
 ;; sequence
 (test (desugar (parse '{sequence {note 40 50 60}}))
-      (sequence (list (note (num 40) (num 50) (num 60)))))
+      (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60)))))
 (test (desugar (parse '{sequence {note 40 50 60}
                                  {note 50 60 70}}))
-      (sequence (list (note (num 40) (num 50) (num 60))
-                      (note (num 50) (num 60) (num 70)))))
+      (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60))
+                        (i-note (i-num 50) (i-num 60) (i-num 70)))))
+;; seqn-p
+;; happy birthday
+(test (desugar (parse '(seqn-p A4 A4 B4 A4 D5 C#5 A4 A4 B4 A4 E5 D5 A4 A4 A5 F#5 D5 C#5 B4 G5 G5 F#5 D5 E5 D5 )))
+      (i-seqn-p
+ (list
+  (i-id 'A4)
+  (i-id 'A4)
+  (i-id 'B4)
+  (i-id 'A4)
+  (i-id 'D5)
+  (i-id 'C#5)
+  (i-id 'A4)
+  (i-id 'A4)
+  (i-id 'B4)
+  (i-id 'A4)
+  (i-id 'E5)
+  (i-id 'D5)
+  (i-id 'A4)
+  (i-id 'A4)
+  (i-id 'A5)
+  (i-id 'F#5)
+  (i-id 'D5)
+  (i-id 'C#5)
+  (i-id 'B4)
+  (i-id 'G5)
+  (i-id 'G5)
+  (i-id 'F#5)
+  (i-id 'D5)
+  (i-id 'E5)
+  (i-id 'D5))))
+
 ;; seq-append
 (test (desugar (parse '{seq-append
                         {sequence {note 30 40 50}
                                   {note 20 30 40}}
                         {sequence {note 40 50 60}}}))
-      (insert
-       (sequence
-         (list (note (num 30) (num 40) (num 50))
-               (note (num 20) (num 30) (num 40))))
-       (sequence (list (note (num 40) (num 50) (num 60))))
-       (num 2)))
+      (i-insert
+       (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50)) (i-note (i-num 20) (i-num 30) (i-num 40))))
+       (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60))))
+       (i-num 2)))
+(test (desugar (parse '{seq-append {seqn-p C4 C4} {seqn-p G4 G4 A4 A4 G4}}))
+      (i-insert (i-seqn-p (list (i-id 'C4) (i-id 'C4)))
+                (i-seqn-p (list (i-id 'G4) (i-id 'G4) (i-id 'A4) (i-id 'A4) (i-id 'G4)))
+                (i-num 2)))
 
 ;; with
 (test (desugar (parse '{with {c
                               {sequence {note 10 20 30}}}
                              c}))
-      (app (fun 'c (id 'c))
-           (sequence (list (note (num 10) (num 20) (num 30))))))
+      (i-app (i-fun 'c (i-id 'c)) (i-sequence (list (i-note (i-num 10) (i-num 20) (i-num 30))))))
 ;; interleave
 (test (desugar (parse '{interleave {sequence {note 30 40 50}}
                                    {sequence {note 40 50 60}}}))
-      (interleave
-       (sequence (list (note (num 30) (num 40) (num 50))))
-       (sequence (list (note (num 40) (num 50) (num 60))))))
+      (i-interleave (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50))))
+                    (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60))))))
+(test (desugar (parse '{interleave {seqn-p A4}{seqn-p A4}}))
+      (i-interleave (i-seqn-p (list (i-id 'A4))) (i-seqn-p (list (i-id 'A4)))))
 ;; insert
 (test (desugar (parse '{insert {sequence {note 20 30 40}}
                                {sequence {note 30 40 50}
                                          {note 40 50 60}
                                          {note 10 20 30}}
                                2}))
-      (insert
-       (sequence (list (note (num 20) (num 30) (num 40))))
-       (sequence
-         (list
-          (note (num 30) (num 40) (num 50))
-          (note (num 40) (num 50) (num 60))
-          (note (num 10) (num 20) (num 30))))
-       (num 2)))
+      (i-insert
+       (i-sequence (list (i-note (i-num 20) (i-num 30) (i-num 40))))
+       (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50))
+                         (i-note (i-num 40) (i-num 50) (i-num 60))
+                         (i-note (i-num 10) (i-num 20) (i-num 30))))
+       (i-num 2)))
+(test (desugar (parse '{insert {seqn-p A4 A4} {seqn-p B4 B4} 1}))
+      (i-insert (i-seqn-p (list (i-id 'A4) (i-id 'A4)))
+                (i-seqn-p (list (i-id 'B4) (i-id 'B4)))
+                (i-num 1)))
 ;; transpose
 (test (desugar (parse '{transpose {sequence {note 30 40 50}} 14}))
-      (transpose (sequence (list (note (num 30) (num 40) (num 50)))) (num 14)))
+      (i-transpose (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50)))) (i-num 14)))
+(test (desugar (parse '{transpose {seqn-p A4} 23}))
+      (i-transpose (i-seqn-p (list (i-id 'A4))) (i-num 23)))
+;; changeVelocity
+(test (desugar (parse '{changeVelocity {sequence {note 10 20 30}} 40}))
+      (changeProp (i-sequence (list (i-note (i-num 10) (i-num 20) (i-num 30)))) (i-num 40) (i-num 2)))
+(test (desugar (parse '{changeVelocity {seqn-p C4 C4 G4 G4} 7}))
+      (changeProp (i-seqn-p (list (i-id 'C4) (i-id 'C4) (i-id 'G4) (i-id 'G4))) (i-num 7) (i-num 2)))
 ;; markov
 (test  (desugar (parse '{markov
                          {sequence {note 20 30 40}
@@ -201,20 +251,22 @@
                                    {note 40 50 60}}
                          20
                          {sequence {note 20 30 40}}}))
-       (markov
-        (sequence
-          (list
-           (note (num 20) (num 30) (num 40))
-           (note (num 30) (num 40) (num 50))
-           (note (num 40) (num 50) (num 60))))
-        (num 20)
-        (sequence (list (note (num 20) (num 30) (num 40))))))
+       (i-markov
+        (i-sequence (list (i-note (i-num 20) (i-num 30) (i-num 40))
+                          (i-note (i-num 30) (i-num 40) (i-num 50))
+                          (i-note (i-num 40) (i-num 50) (i-num 60))))
+        (i-num 20)
+        (i-sequence (list (i-note (i-num 20) (i-num 30) (i-num 40))))))
+(test (desugar (parse '{markov {seqn-p C4 D4 E4 F4 G4 A4 B4} 10 {seqn-p E4}}))
+      (i-markov (i-seqn-p (list (i-id 'C4) (i-id 'D4) (i-id 'E4) (i-id 'F4) (i-id 'G4) (i-id 'A4) (i-id 'B4)))
+                (i-num 10)
+                (i-seqn-p (list (i-id 'E4)))))
         
 (define (decode-pitch sym)
   (match sym
     ;[(? number?) (num sym)]
     [(? symbol?) (match (symbol->string sym)
-                   [(regexp #rx"[A-G](#|b)*[0-9]+$")(num (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
+                  [(regexp #rx"[A-G](#|b)*[0-9]+$")(num (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
                                                         ['("C") 0]
                                                         ['("D") 2]
                                                         ['("E") 4]
@@ -249,20 +301,43 @@
 
 (define (interp d-mse)
   (local [(define (transOne val m env)
-            (type-case MSE m
-              [note (p v d)  (note (num (+ (helper val env) (helper p env))) v d)]
+            (type-case D-MSE m
+              [i-note (p v d)  (i-note (i-num (+ (helper val env) (helper p env))) v d)]
               [else (transOne val
                               (type-case MSE-Value (helper m env)
-                                [noteV (p v d) (note p v d)]
+                                [noteV (p v d) (i-note p v d)]
                                 [else "need a note"]) env)]))
-          (define (doInsert lis2 lis n)
-            (cond [(> n (length lis)) (append lis lis2)]
-                  [(= n 0)(append lis2 lis)]
+          (define (changeVol val m env)
+            (type-case D-MSE m
+              [i-note (p v d)  (i-note p val d)]
+              [else (changeVol val
+                              (type-case MSE-Value (helper m env)
+                                [noteV (p v d) (i-note p v d)]
+                                [else "need a note"]) env)]))
+          (define (changePit val m env)
+            (type-case D-MSE m
+              [i-note (p v d)  (i-note val v d)]
+              [else (changePit val
+                              (type-case MSE-Value (helper m env)
+                                [noteV (p v d) (i-note p v d)]
+                                [else "need a note"]) env)]))
+          (define (changeDur val m env)
+            (type-case D-MSE m
+              [i-note (p v d)  (i-note p v val)]
+              [else (changeDur val
+                              (type-case MSE-Value (helper m env)
+                                [noteV (p v d) (i-note p v d)]
+                                [else "need a note"]) env)]))
+          (define (doInsert lis1 lis2 n)
+            (cond [(> n (length lis1)) (append lis1 lis2)]
+                  [(= n 0)(append lis1 lis2)]
                   [else
-                   (cons (first lis) (doInsert lis2 (rest lis) (sub1 n)))]))
+                   (cons (first lis1) (doInsert (rest lis1)lis2 (sub1 n)))]))
           (define (tolist seq)
-            (type-case MSE seq
-              [sequence (l) l]
+            (type-case D-MSE seq
+              [i-sequence (l) l]
+              [i-seqn-p (l) (map (lambda (sym) (i-note (i-num (interp sym))
+                                               (i-num 10)  (i-num 10))) l)]
               [else (error "need a sequence")]))
           (define (inter lis1 lis2)
             (cond [(empty? lis1) lis2]
@@ -272,25 +347,28 @@
                                     (inter (rest lis1) (rest lis2))))]))
           ;(define (markov lis 
           (define (helper expr env)
-            (type-case MSE expr
-              [num (n) n]
-              [note (p v d) (noteV (pitchV p)
-                                   (velV v)
-                                   (durV d))]
-              [id  (name)  (lookup name env)]
-              [sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
-              [seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
-                                                           (velV (num 10))
-                                                           (durV (num 10)))) syms))]
-              [fun (arg-name body) (closureV arg-name body env)]
-              [app (fun-expr arg-expr)
+            (type-case D-MSE expr
+              [i-num (n) n]
+              [i-note (p v d) (noteV (pitchV (helper p env))
+                                   (velV (helper v env) )
+                                   (durV (helper d env)))]
+              [i-id  (name)  (lookup name env)]
+              [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
+              [i-seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
+                                                           (velV  (num 10))
+                                                           (durV  (num 10)))) syms))]
+              [i-fun (arg-name body) (closureV arg-name body env)]
+              [i-app (fun-expr arg-expr)
                    (local ([define fun-val (helper fun-expr env)]
                            [define arg-val (helper arg-expr env)])
                      (helper (closureV-body fun-val)
                              (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
-              [interleave (l1 l2) (helper (sequence (inter (tolist l1) (tolist l2))) env)]
-              [insert (l1 l2 index) (helper (sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
-              [transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
+              [i-interleave (l1 l2) (helper (i-sequence (inter (tolist l1) (tolist l2))) env)]
+              [i-insert (l1 l2 index) (helper (i-sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
+              [i-transpose (listN value)  (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
+              [changeProp (listN value pos) (cond [(= 1 (helper pos env)) (helper (i-sequence (map (lambda (m) (changePit value m env)) (tolist listN))) env)]
+                                                [(= 2 (helper pos env)) (helper (i-sequence (map (lambda (m) (changeVol value m env)) (tolist listN))) env)]
+                                                [(= 3 (helper pos env)) (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env)])]
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
 
@@ -301,25 +379,26 @@
 
 (test (run '{with {c {sequence {note 10 20 30}}}
                              c})
-      (seqV (list (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30))))))
+      (seqV (list (noteV (pitchV 10) (velV 20) (durV 30)))))
 
 (test (run '(interleave (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
 (seqV
  (list
-  (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
-  (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
-  (noteV (pitchV (num 20)) (velV (num 20)) (durV (num 20)))
-  (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30))))))
+  (noteV (pitchV 10) (velV 20) (durV 30))
+  (noteV (pitchV 30) (velV 20) (durV 10))
+  (noteV (pitchV 20) (velV 20) (durV 20))
+  (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 (test (run '(interleave (sequence (note 10 20 30)) (sequence (note 30 20 10) (note 30 30 30))))
-(seqV (list (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
-            (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
-            (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30))))))
+(seqV (list (noteV (pitchV 10) (velV 20) (durV 30))
+            (noteV (pitchV 30) (velV 20) (durV 10))
+            (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 (test (run '(seq-append (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
 (seqV
  (list
-  (noteV (pitchV (num 30)) (velV (num 20)) (durV (num 10)))
-  (noteV (pitchV (num 30)) (velV (num 30)) (durV (num 30)))
-  (noteV (pitchV (num 10)) (velV (num 20)) (durV (num 30)))
-  (noteV (pitchV (num 20)) (velV (num 20)) (durV (num 20))))))
+  (noteV (pitchV 10) (velV 20) (durV 30))
+  (noteV (pitchV 20) (velV 20) (durV 20))
+  (noteV (pitchV 30) (velV 20) (durV 10))
+  (noteV (pitchV 30) (velV 30) (durV 30)))))
+
