@@ -23,7 +23,9 @@
 ;;     | <id>
 ;;     | {note <num> <num> <num>}
 ;;     | {sequence <MSE>*}
-;;     | {seqn-p <MSE>*}                            ; A list of given notes in letter format (e.g. A4 E5)
+;;     | {seqn-p <MSE>*}                            ; A list of given notes in number or letter format (e.g. 60 A4 E5)
+;;     | {seqn-v <MSE>*}                            ; A list of given velocities in number format (e.g. 60 127)
+;;     | {seqn-d <MSE>*}                            ; A list of given duration in letter or number format (e.g. 500 1000)
 ;;     | {seq-append <MSE> to <MSE>}                ; Appends the 2nd MSE Expression to
 ;;                                                    the end of the first
 ;;     | {with {<id> <MSE>} <MSE>}     
@@ -33,6 +35,10 @@
 ;;     | {insert <MSE> in <MSE> at <num>}        ; Inserts MSE in MSE at index number
 ;;     | {transpose <MSE> <num>}                 ; Takes a sequence of notes and a number, and
 ;;                                                    adds that number to the pitch of all notes in the sequence
+;;     | {transpose for vel}
+;;     | {transpose for dur}
+;;     | {set vals} TODO
+;;     | {Zip}
 ;;     | {markov <MSE> <num> <MSE>?}             ; Runs markov chain (with a depth of 1) as shown in the example above
 
 ; Note Message is 3 bytes
