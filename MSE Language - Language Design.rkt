@@ -191,6 +191,7 @@
   (i-id 'D5)
   (i-id 'E5)
   (i-id 'D5))))
+
 ;; seq-append
 (test (desugar (parse '{seq-append
                         {sequence {note 30 40 50}
@@ -200,7 +201,10 @@
        (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50)) (i-note (i-num 20) (i-num 30) (i-num 40))))
        (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60))))
        (i-num 2)))
-
+(test (desugar (parse '{seq-append {seqn-p C4 C4} {seqn-p G4 G4 A4 A4 G4}}))
+      (i-insert (i-seqn-p (list (i-id 'C4) (i-id 'C4)))
+                (i-seqn-p (list (i-id 'G4) (i-id 'G4) (i-id 'A4) (i-id 'A4) (i-id 'G4)))
+                (i-num 2)))
 
 ;; with
 (test (desugar (parse '{with {c
