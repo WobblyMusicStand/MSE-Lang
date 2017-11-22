@@ -328,11 +328,11 @@
                               (type-case MSE-Value (helper m env)
                                 [noteV (p v d) (i-note p v d)]
                                 [else "need a note"]) env)]))
-          (define (doInsert lis2 lis n)
-            (cond [(> n (length lis)) (append lis lis2)]
-                  [(= n 0)(append lis2 lis)]
+          (define (doInsert lis1 lis2 n)
+            (cond [(> n (length lis1)) (append lis1 lis2)]
+                  [(= n 0)(append lis1 lis2)]
                   [else
-                   (cons (first lis) (doInsert lis2 (rest lis) (sub1 n)))]))
+                   (cons (first lis1) (doInsert (rest lis1)lis2 (sub1 n)))]))
           (define (tolist seq)
             (type-case D-MSE seq
               [i-sequence (l) l]
@@ -397,7 +397,8 @@
 (test (run '(seq-append (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
 (seqV
  (list
-  (noteV (pitchV 30) (velV 20) (durV 10))
-  (noteV (pitchV 30) (velV 30) (durV 30))
   (noteV (pitchV 10) (velV 20) (durV 30))
-  (noteV (pitchV 20) (velV 20) (durV 20)))))
+  (noteV (pitchV 20) (velV 20) (durV 20))
+  (noteV (pitchV 30) (velV 20) (durV 10))
+  (noteV (pitchV 30) (velV 30) (durV 30)))))
+
