@@ -21,25 +21,47 @@
 ;;
 ;; <MSE> ::= <num>
 ;;     | <id>
-;;     | {note <num> <num> <num>}
-;;     | {sequence <MSE>*}
-;;     | {seqn-p <MSE>*}                            ; A list of given notes in number or letter format (e.g. 60 A4 E5)
-;;     | {seqn-v <MSE>*}                            ; A list of given velocities in number format (e.g. 60 127)
-;;     | {seqn-d <MSE>*}                            ; A list of given duration in letter or number format (e.g. 500 1000)
-;;     | {seq-append <MSE> to <MSE>}                ; Appends the 2nd MSE Expression to
-;;                                                    the end of the first
 ;;     | {with {<id> <MSE>} <MSE>}     
 ;;     | {fun {<id> <MSE>} <MSE>}
 ;;     | {<MSE> <MSE> }                             ; function calls, any time the first symbol is not a reserved word
+;;
+;;     | {note <num> <num> <num>}
+;;     | {sequence <MSE>*}                          ; a sequence of notes or sequences each occuring after the previous
+;;     | {polyphony <MSE>*}                         ; like sequence, but all elements start at the same time
+;;     | {seqn-p <MSE>*}                            ; seqence constructed using given pitches in number or letter format (e.g. 60 A4 E5)
+;;     | {seqn-v <MSE>*}                            ; seqence constructed using given velocities in number format (e.g. 60 127)
+;;     | {seqn-d <MSE>*}                            ; seqence constructed using given duration in letter or number format (e.g. 500 1000)
+;;
 ;;     | {interleave <MSE> into <MSE>}              ; Takes first element of 1st MSE, appends to 1st element of 2nd MSE ... 
-;;     | {insert <MSE> in <MSE> at <num>}        ; Inserts MSE in MSE at index number
-;;     | {transpose <MSE> <num>}                 ; Takes a sequence of notes and a number, and
+;;     | {insert <MSE> in <MSE> at <num>}           ; Inserts MSE in MSE at index number
+;;     | {seq-append <MSE> to <MSE>}                ; Appends the 2nd MSE Expression to
+;;                                                    the end of the first
+;;
+;;     | {transpose <MSE> <num>}                    ; Takes a sequence of notes and a number, and
 ;;                                                    adds that number to the pitch of all notes in the sequence
-;;     | {transpose for vel}
-;;     | {transpose for dur}
-;;     | {set vals} TODO
-;;     | {Zip}
-;;     | {markov <MSE> <num> <MSE>?}             ; Runs markov chain (with a depth of 1) as shown in the example above
+;;     | { <MSE> <num>}                             ; Takes a sequence of notes and a number, and
+;;                                                    adds that number to the velocity of all notes in the sequence
+;;     | {ext-dur <MSE> <num>}                      ; Takes a sequence of notes and a number, and
+;;                                                    adds that number to the duration of all notes in the sequence
+;;     | {set-pitches <MSE> <num> <num>?}           ; Takes a sequence of notes and pitch and an optional pitch-target
+;;                                                    sets the pitch of all notes to the given pitch. |OR| the pitch of all notes
+;;                                                    equal to pitch-target to the given pitch
+;;     | {set-vels <MSE> <num> <num>?}              ; Takes a sequence of notes and velocity and an optional velocity-target
+;;                                                    sets the pitch of all notes to the given pitch. |OR| the pitch of all notes
+;;                                                    equal to pitch-target to the given pitch
+;;     | {set-durs <MSE> <num> <num>?}              ; Takes a sequence of notes and duration and an optional duration-target
+;;                                                    sets the pitch of all notes to the given pitch. |OR| the pitch of all notes
+;;                                                    equal to pitch-target to the given pitch
+;;
+;;     | {Zip <MSE> <MSE> <MSE>}                    ; Takes 3 <MSE> containing notes.
+;;                                                  ; Creates a new sequence of notes where the pitches are from the first MSE,
+;;                                                  ;     the velocities are from the second MSE, and the durations from the third
+;;                                                  ;     Each new note [i] has the properties from the corresponding note [i] in the given MSEs
+;;                                                  ;     There are as many notes in the new sequence as there are notes in the shortest given MSE
+;;                                                  ;     Strictness point, there must be a finite number of notes in ATLEAST ONE OF the given MSEs
+;;
+;;     | {markov <MSE> <num> <MSE>?}                ; Runs markov chain (with a depth of 1) as shown in the example above
+;;     TODO, long term more generative functions
 
 ; Note Message is 3 bytes
 ; Pitch (0 - 127)
@@ -54,8 +76,8 @@
 (define-type MSE
   [num (n number?)]
   [id (name symbol?)]
-  [note (pitch num?) (vel num?) (dur num?)] ; Pitch, Velocity, Duration
-  [sequence (values (listof note?))]                  ; Distributions must not be empty and strictly evaluate to a (listof Note)
+  [note (pitch num?) (vel num?) (dur num?)]             ; Pitch, Velocity, Duration
+  [sequence (values (listof note?))]                    ; Distributions must not be empty and strictly evaluate to a (listof Note)
   [seqn-p (values (listof MSE?))]
   [seq-append (list1 MSE?) (list2 MSE?)]              
   [with (id symbol?) (expr MSE?) (body MSE?)]
