@@ -259,7 +259,7 @@
   (match sym
     ;[(? number?) (num sym)]
     [(? symbol?) (match (symbol->string sym)
-                   [(regexp #rx"[A-G](#|b)*[0-9]+$")(num (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
+                  [(regexp #rx"[A-G](#|b)*[0-9]+$")(+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
                                                         ['("C") 0]
                                                         ['("D") 2]
                                                         ['("E") 4]
@@ -271,7 +271,7 @@
                                                         ['("b") -1]
                                                         ['("#") 1]
                                                         [else 0])
-                                                      (* (string->number (first (regexp-match #rx"[0-9]+" (symbol->string sym)))) 12)))]
+                                                      (* (string->number (first (regexp-match #rx"[0-9]+" (symbol->string sym)))) 12))]
                     [else (error "Not a valid pitch: " sym)])]
     [else (error "Not a valid pitch: " sym)]
     ))
@@ -346,8 +346,8 @@
               [i-id  (name)  (lookup name env)]
               [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
               [i-seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
-                                                           (velV (num 10))
-                                                           (durV (num 10)))) syms))]
+                                                           (velV  10)
+                                                           (durV  10))) syms))]
               [i-fun (arg-name body) (closureV arg-name body env)]
               [i-app (fun-expr arg-expr)
                    (local ([define fun-val (helper fun-expr env)]
