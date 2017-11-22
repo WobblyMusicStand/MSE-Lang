@@ -133,7 +133,10 @@
     [seq-append (seq1 seq2)
                 (i-insert (desugar seq1)
                         (desugar seq2)
-                        (i-num (length (i-sequence-values (desugar seq1)))))] 
+                        (i-num (length (type-case MSE seq1
+                                         [sequence (s) (i-sequence-values (desugar seq1))]
+                                         [seqn-p (s) (i-seqn-p-values (desugar seq1))]
+                                         [else (error "need a sequence or seqn-p")]))))] 
     [with (id named-expr body) (desugar (app (fun id body) named-expr))]
     [fun (param body) (i-fun param (desugar body))]
     [app (fn-exp arg-exp) (i-app (desugar fn-exp)
