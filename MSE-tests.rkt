@@ -52,6 +52,8 @@
 (test/exn (parse '{with {Cbb4 1} 1}) "")
 (test/exn (parse '{with {C##4 1} 1}) "")
 (test/exn (parse '{with {C10000 1} 1}) "")
+(test (parse '{with {Dg4 1} 1}) (with 'Dg4 (num 1) (num 1))) ;go right ahead with your malformed ids
+
 
 ;;;;;;;;;;;;;;;;   DESUGARER tests   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -75,32 +77,32 @@
 ;; happy birthday
 (test (desugar (parse '(seqn-p A4 A4 B4 A4 D5 C#5 A4 A4 B4 A4 E5 D5 A4 A4 A5 F#5 D5 C#5 B4 G5 G5 F#5 D5 E5 D5 )))
       (i-seqn-p
- (list
-  (i-id 'A4)
-  (i-id 'A4)
-  (i-id 'B4)
-  (i-id 'A4)
-  (i-id 'D5)
-  (i-id 'C#5)
-  (i-id 'A4)
-  (i-id 'A4)
-  (i-id 'B4)
-  (i-id 'A4)
-  (i-id 'E5)
-  (i-id 'D5)
-  (i-id 'A4)
-  (i-id 'A4)
-  (i-id 'A5)
-  (i-id 'F#5)
-  (i-id 'D5)
-  (i-id 'C#5)
-  (i-id 'B4)
-  (i-id 'G5)
-  (i-id 'G5)
-  (i-id 'F#5)
-  (i-id 'D5)
-  (i-id 'E5)
-  (i-id 'D5))))
+       (list
+        (i-id 'A4)
+        (i-id 'A4)
+        (i-id 'B4)
+        (i-id 'A4)
+        (i-id 'D5)
+        (i-id 'C#5)
+        (i-id 'A4)
+        (i-id 'A4)
+        (i-id 'B4)
+        (i-id 'A4)
+        (i-id 'E5)
+        (i-id 'D5)
+        (i-id 'A4)
+        (i-id 'A4)
+        (i-id 'A5)
+        (i-id 'F#5)
+        (i-id 'D5)
+        (i-id 'C#5)
+        (i-id 'B4)
+        (i-id 'G5)
+        (i-id 'G5)
+        (i-id 'F#5)
+        (i-id 'D5)
+        (i-id 'E5)
+        (i-id 'D5))))
 
 ;; seq-append
 (test (desugar (parse '{seq-append
@@ -177,31 +179,61 @@
 ;;;;;;;;;;;;;;;;   INTERPRETER tests   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; test cases
+;; test pitch-ids
+(test (run 'A3) 45)
+(test (run 'B3) 47)
+(test (run 'Cb4) 47)
+(test (run 'B#3) 48)
+(test (run 'C4) 48)
+(test (run 'C#4) 49)
+(test (run 'D4) 50)
+(test (run 'E4) 52)
+(test (run 'F4) 53)
+(test (run 'G4) 55)
+(test (run 'A4) 57)
+(test (run 'B4) 59)
+(test (run 'C5) 60)
+
+(test (run 'C0) 0)
+(test (run 'C10) 120)
+
+(test (run 'Cbb4) (num 46))
+(test (run 'C##4) (num 50))
+(test (run 'Cb#4) (num 48))
+(test (run 'C#b4) (num 48))
+
+(test/exn (run 'B-1) "") ;out of range
+(test/exn (run 'C) "")   ;no octave
+(test/exn (run 'Cg5) "") ;incorrect b/# symbol
+(test/exn (run 'h) "")   ;no
+(test (run '0) 0)        ;duh
+
+
+
 
 (test (run '{with {c {sequence {note 10 20 30}}}
-                             c})
+                  c})
       (seqV (list (noteV (pitchV 10) (velV 20) (durV 30)))))
 
 (test (run '(interleave (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
-(seqV
- (list
-  (noteV (pitchV 10) (velV 20) (durV 30))
-  (noteV (pitchV 30) (velV 20) (durV 10))
-  (noteV (pitchV 20) (velV 20) (durV 20))
-  (noteV (pitchV 30) (velV 30) (durV 30)))))
+      (seqV
+       (list
+        (noteV (pitchV 10) (velV 20) (durV 30))
+        (noteV (pitchV 30) (velV 20) (durV 10))
+        (noteV (pitchV 20) (velV 20) (durV 20))
+        (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 (test (run '(interleave (sequence (note 10 20 30)) (sequence (note 30 20 10) (note 30 30 30))))
-(seqV (list (noteV (pitchV 10) (velV 20) (durV 30))
-            (noteV (pitchV 30) (velV 20) (durV 10))
-            (noteV (pitchV 30) (velV 30) (durV 30)))))
+      (seqV (list (noteV (pitchV 10) (velV 20) (durV 30))
+                  (noteV (pitchV 30) (velV 20) (durV 10))
+                  (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 (test (run '(seq-append (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
-(seqV
- (list
-  (noteV (pitchV 10) (velV 20) (durV 30))
-  (noteV (pitchV 20) (velV 20) (durV 20))
-  (noteV (pitchV 30) (velV 20) (durV 10))
-  (noteV (pitchV 30) (velV 30) (durV 30)))))
+      (seqV
+       (list
+        (noteV (pitchV 10) (velV 20) (durV 30))
+        (noteV (pitchV 20) (velV 20) (durV 20))
+        (noteV (pitchV 30) (velV 20) (durV 10))
+        (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 
