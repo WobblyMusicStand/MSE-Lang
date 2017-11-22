@@ -41,8 +41,10 @@
 ; Duration (Time in milliseconds)
 
 
+;;;;;;;;;;;;;;;;   Type-Definitions   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; for desugar
+;; MSE, for desugar
 (define-type MSE
   [num (n number?)]
   [id (name symbol?)]
@@ -56,24 +58,59 @@
   [interleave (list1 MSE?) (list2 MSE?)]
   [insert (list1 MSE?) (list2 MSE?) (index num?)]
   [transpose (list1 MSE?) (add-val num?)]
+  [changeVelocity (list1 MSE?) (val num?)]
   [markov (seed MSE?) (length num?) (initial-note MSE?)] ; initial-note has to evaluate to a note
   )
 
-;; for interpreter
+;; D-MSE, for interpreter
 ;; exclude seq-append and with
 (define-type D-MSE
   [i-num (n number?)]
   [i-id (name symbol?)]
-  [i-note (pitch num?) (vel num?) (dur num?)]
-  [i-sequence (values (listof note?))]
+  [i-note (pitch D-MSE?) (vel D-MSE?) (dur D-MSE?)]
+  [i-sequence (values (listof i-note?))]
+  [i-seqn-p (values (listof D-MSE?))]
   [i-fun (param symbol?) (body D-MSE?)]
   [i-app (function D-MSE?) (arg D-MSE?)]
   [i-interleave (list1 D-MSE?) (list2 D-MSE?)]
-  [i-insert (list1 D-MSE?)(list2 D-MSE?)(index num?)]
-  [i-transpose (list1 D-MSE?)(add-val num?)]
-  [i-markov (seed D-MSE?)(length num?)(initial-note D-MSE?)]
+  [i-insert (list1 D-MSE?)(list2 D-MSE?)(index i-num?)]
+  [i-transpose (list1 D-MSE?)(add-val i-num?)]
+  [changeProp (list1 D-MSE?) (val i-num?) (pos i-num?)]
+  [i-markov (seed D-MSE?)(length i-num?)(initial-note D-MSE?)]
   )
 
+;; Interpreting a value returns a Value
+(define-type MSE-Value
+  ; Sequence of  Notes
+  [pitchV (pit number?)]
+  [velV (vel number?)]
+  [durV (dur number?)]
+  [noteV (p pitchV?) (vel velV?) (dur durV?)]
+  [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))] ;;Distributions must not be empty
+  [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
+            (body D-MSE?)
+            (env Env?)])
+
+;; Environments store values, instead of substitutions
+(define-type Env
+  [mtEnv]
+  [anEnv (name symbol?) (value MSE-Value?) (env Env?)])
+
+(define *reserved-symbols* '(note sequence seq-append with interleave insert transpose markov)) ; defining what the reserved symbols of the system are
+
+
+;;;;;;;;;;;;;;;;   PARSER   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; valid-identifier? : symbol -> boolean
+;; Returns whether the given input is a symbol and a valid identifier
+(define (valid-id? sym)
+  (and (symbol? sym)
+       (not (member sym *reserved-symbols*))))
+
+;;parse s-exp -> MSE
+;;Parses s-exp input and does valid-id checking for binding sites
 (define (parse sexp)
   (match sexp
     [(? number?) (num sexp)]
@@ -89,68 +126,59 @@
     [(list 'interleave list1 list2) (interleave (parse list1) (parse list2))]
     [(list 'insert list1 list2 index) (insert (parse list1) (parse list2) (parse index))]
     [(list 'transpose list1 add-val) (transpose (parse list1) (parse add-val))]
+    [(list 'changeVelocity list1 val) (changeVelocity (parse list1) (parse val))]
     [(list 'markov seed length initial-note) (markov (parse seed) (parse length) (parse initial-note))]))
 
 
-(define *reserved-symbols* '(note sequence seq-append with interleave insert transpose markov)) ; defining what the reserved symbols of the system are
 
-;; valid-identifier? : symbol -> boolean
-;; Returns whether the given input is a symbol and a valid identifier
-(define (valid-id? sym)
-  (and (symbol? sym)
-       (not (member sym *reserved-symbols*))))
 
-;; Environments store values, instead of substitutions
-(define-type Env
-  [mtEnv]
-  [anEnv (name symbol?) (value MSE-Value?) (env Env?)])
 
-;; Interpreting a value returns a Value
-(define-type MSE-Value
-  ; Sequence of  Notes
-  [pitchV (pit num?)]
-  [velV (vel num?)]
-  [durV (dur num?)]
-  [noteV (p pitchV?) (vel velV?) (dur durV?)]
-  [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))] ;;Distributions must not be empty
-  [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
-            (body MSE?)
-            (env Env?)])
+;;;;;;;;;;;;;;;;   DESUGARER   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+;;desugar MSE -> D-MSE
 (define (desugar p-mse)
   (type-case MSE p-mse
-    [num (n) (num n)]
-    [id (val) (id val)]
-    [note (p v d) (note (desugar p)
+   [num (n) (i-num n)]
+    [id (val) (i-id val)]
+    [note (p v d) (i-note (desugar p)
                         (desugar v)
                         (desugar d))]
-    [sequence (vals) (sequence (map desugar vals))]
-    [seqn-p (vals) (seqn-p (map desugar vals))]
+    [sequence (vals) (i-sequence (map desugar vals))]
+    [seqn-p (vals) (i-seqn-p (map desugar vals))]
     [seq-append (seq1 seq2)
-                (insert (desugar seq1)
+                (i-insert (desugar seq1)
                         (desugar seq2)
-                        (num (length (sequence-values (desugar seq1)))))] 
+                        (i-num (length (type-case MSE seq1
+                                         [sequence (s) (i-sequence-values (desugar seq1))]
+                                         [seqn-p (s) (i-seqn-p-values (desugar seq1))]
+                                         [else (error "need a sequence or seqn-p")]))))] 
     [with (id named-expr body) (desugar (app (fun id body) named-expr))]
-    [fun (param body) (fun param (desugar body))]
-    [app (fn-exp arg-exp) (app (desugar fn-exp)
+    [fun (param body) (i-fun param (desugar body))]
+    [app (fn-exp arg-exp) (i-app (desugar fn-exp)
                                (desugar arg-exp))]
     [interleave (lst1 lst2)
-                (interleave (desugar lst1)(desugar lst2))]
+                (i-interleave (desugar lst1)(desugar lst2))]
     [insert (lst1 lst2 index)
-            (insert (desugar lst1)(desugar lst2)(desugar index))]
-    [transpose (lst1 anum)
-               (transpose (desugar lst1)(desugar anum))]
+            (i-insert (desugar lst1)(desugar lst2)(desugar index))]
+    [transpose (lst1 anum )
+               (i-transpose (desugar lst1)(desugar anum))]
+    [changeVelocity (list1 val) (changeProp (desugar list1) (desugar val) (i-num 2))]
     [markov (s lth ini)
-            (markov (desugar s)(desugar lth)(desugar ini))]
+            (i-markov (desugar s)(desugar lth)(desugar ini))]
     ))
 
 
-        
+;;;;;;;;;;;;;;;;   INTERPRETER   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;decode-pitch symbol -> number        
 (define (decode-pitch sym)
   (match sym
     ;[(? number?) (num sym)]
     [(? symbol?) (match (symbol->string sym)
-                   [(regexp #rx"[A-G](#|b)*[0-9]+$")(num (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
+                  [(regexp #rx"[A-G](#|b)*[0-9]+$")(num (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
                                                         ['("C") 0]
                                                         ['("D") 2]
                                                         ['("E") 4]
@@ -166,7 +194,9 @@
                     [else (error "Not a valid pitch: " sym)])]
     [else (error "Not a valid pitch: " sym)]
     ))
-        
+
+
+;;lookup symbol -> MSE
 (define (lookup name env)
   (local ([define (lookup-helper name env)
             (type-case Env env
@@ -183,22 +213,47 @@
         (decode-pitch name) 
         (lookup-helper name env))))
 
+
+;;interp D-MSE -> MSE-Value
 (define (interp d-mse)
   (local [(define (transOne val m env)
-            (type-case MSE m
-              [note (p v d)  (note (num (+ (helper val env) (helper p env))) v d)]
+            (type-case D-MSE m
+              [i-note (p v d)  (i-note (i-num (+ (helper val env) (helper p env))) v d)]
               [else (transOne val
                               (type-case MSE-Value (helper m env)
-                                [noteV (p v d) (note p v d)]
+                                [noteV (p v d) (i-note p v d)]
                                 [else "need a note"]) env)]))
-          (define (doInsert lis2 lis n)
-            (cond [(> n (length lis)) (append lis lis2)]
-                  [(= n 0)(append lis2 lis)]
+          (define (changeVol val m env)
+            (type-case D-MSE m
+              [i-note (p v d)  (i-note p val d)]
+              [else (changeVol val
+                              (type-case MSE-Value (helper m env)
+                                [noteV (p v d) (i-note p v d)]
+                                [else "need a note"]) env)]))
+          (define (changePit val m env)
+            (type-case D-MSE m
+              [i-note (p v d)  (i-note val v d)]
+              [else (changePit val
+                              (type-case MSE-Value (helper m env)
+                                [noteV (p v d) (i-note p v d)]
+                                [else "need a note"]) env)]))
+          (define (changeDur val m env)
+            (type-case D-MSE m
+              [i-note (p v d)  (i-note p v val)]
+              [else (changeDur val
+                              (type-case MSE-Value (helper m env)
+                                [noteV (p v d) (i-note p v d)]
+                                [else "need a note"]) env)]))
+          (define (doInsert lis1 lis2 n)
+            (cond [(> n (length lis1)) (append lis1 lis2)]
+                  [(= n 0)(append lis1 lis2)]
                   [else
-                   (cons (first lis) (doInsert lis2 (rest lis) (sub1 n)))]))
+                   (cons (first lis1) (doInsert (rest lis1)lis2 (sub1 n)))]))
           (define (tolist seq)
-            (type-case MSE seq
-              [sequence (l) l]
+            (type-case D-MSE seq
+              [i-sequence (l) l]
+              [i-seqn-p (l) (map (lambda (sym) (i-note (i-num (interp sym))
+                                               (i-num 10)  (i-num 10))) l)]
               [else (error "need a sequence")]))
           (define (inter lis1 lis2)
             (cond [(empty? lis1) lis2]
@@ -206,30 +261,37 @@
                   [else (cons (first lis1)
                               (cons (first lis2)
                                     (inter (rest lis1) (rest lis2))))]))
-          ;(define (markov lis 
+          ;(define (markov list) TODO! 
           (define (helper expr env)
-            (type-case MSE expr
-              [num (n) n]
-              [note (p v d) (noteV (pitchV p)
-                                   (velV v)
-                                   (durV d))]
-              [id  (name)  (lookup name env)]
-              [sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
-              [seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
-                                                           (velV (num 10))
-                                                           (durV (num 10)))) syms))]
-              [fun (arg-name body) (closureV arg-name body env)]
-              [app (fun-expr arg-expr)
+            (type-case D-MSE expr
+              [i-num (n) n]
+              [i-note (p v d) (noteV (pitchV (helper p env))
+                                   (velV (helper v env) )
+                                   (durV (helper d env)))]
+              [i-id  (name)  (lookup name env)]
+              [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
+              [i-seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
+                                                           (velV  (num 10))
+                                                           (durV  (num 10)))) syms))]
+              [i-fun (arg-name body) (closureV arg-name body env)]
+              [i-app (fun-expr arg-expr)
                    (local ([define fun-val (helper fun-expr env)]
                            [define arg-val (helper arg-expr env)])
                      (helper (closureV-body fun-val)
                              (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
-              [interleave (l1 l2) (helper (sequence (inter (tolist l1) (tolist l2))) env)]
-              [insert (l1 l2 index) (helper (sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
-              [transpose (listN value)  (helper (sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
+              [i-interleave (l1 l2) (helper (i-sequence (inter (tolist l1) (tolist l2))) env)]
+              [i-insert (l1 l2 index) (helper (i-sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
+              [i-transpose (listN value)  (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
+              [changeProp (listN value pos) (cond [(= 1 (helper pos env)) (helper (i-sequence (map (lambda (m) (changePit value m env)) (tolist listN))) env)]
+                                                [(= 2 (helper pos env)) (helper (i-sequence (map (lambda (m) (changeVol value m env)) (tolist listN))) env)]
+                                                [(= 3 (helper pos env)) (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env)])]
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
 
+
+;;Run MSE -> MSE-Value
+;;Interprets the result of desugaring the parse s-expression
 (define (run mse)
   (interp (desugar (parse mse))))
+
 
