@@ -332,6 +332,8 @@
           (define (tolist seq)
             (type-case D-MSE seq
               [i-sequence (l) l]
+              [i-seqn-p (l) (map (lambda (sym) (i-note (i-num (interp sym))
+                                               (i-num 10)  (i-num 10))) l)]
               [else (error "need a sequence")]))
           (define (inter lis1 lis2)
             (cond [(empty? lis1) lis2]
