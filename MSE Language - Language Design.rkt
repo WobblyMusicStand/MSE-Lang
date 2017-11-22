@@ -242,7 +242,7 @@
   (match sym
     ;[(? number?) (num sym)]
     [(? symbol?) (match (symbol->string sym)
-                   [(regexp #rx"[A-G](#|b)*[0-9]+$" (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
+                  [(regexp #rx"[A-G](#|b)*[0-9]+$")(+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
                                                         ['("C") 0]
                                                         ['("D") 2]
                                                         ['("E") 4]
