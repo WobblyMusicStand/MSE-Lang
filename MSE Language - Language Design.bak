@@ -209,8 +209,6 @@
                                    {sequence {note 40 50 60}}}))
       (i-interleave (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50))))
                     (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60))))))
-(test (desugar (parse '{interleave {seqn-p A4}{seqn-p A4}}))
-      (i-interleave (i-seqn-p (list (i-id 'A4))) (i-seqn-p (list (i-id 'A4)))))
 ;; insert
 (test (desugar (parse '{insert {sequence {note 20 30 40}}
                                {sequence {note 30 40 50}
@@ -223,20 +221,9 @@
                          (i-note (i-num 40) (i-num 50) (i-num 60))
                          (i-note (i-num 10) (i-num 20) (i-num 30))))
        (i-num 2)))
-(test (desugar (parse '{insert {seqn-p A4 A4} {seqn-p B4 B4} 1}))
-      (i-insert (i-seqn-p (list (i-id 'A4) (i-id 'A4)))
-                (i-seqn-p (list (i-id 'B4) (i-id 'B4)))
-                (i-num 1)))
 ;; transpose
 (test (desugar (parse '{transpose {sequence {note 30 40 50}} 14}))
       (i-transpose (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50)))) (i-num 14)))
-(test (desugar (parse '{transpose {seqn-p A4} 23}))
-      (i-transpose (i-seqn-p (list (i-id 'A4))) (i-num 23)))
-;; changeVelocity
-(test (desugar (parse '{changeVelocity {sequence {note 10 20 30}} 40}))
-      (changeProp (i-sequence (list (i-note (i-num 10) (i-num 20) (i-num 30)))) (i-num 40) (i-num 2)))
-(test (desugar (parse '{changeVelocity {seqn-p C4 C4 G4 G4} 7}))
-      (changeProp (i-seqn-p (list (i-id 'C4) (i-id 'C4) (i-id 'G4) (i-id 'G4))) (i-num 7) (i-num 2)))
 ;; markov
 (test  (desugar (parse '{markov
                          {sequence {note 20 30 40}
@@ -250,10 +237,6 @@
                           (i-note (i-num 40) (i-num 50) (i-num 60))))
         (i-num 20)
         (i-sequence (list (i-note (i-num 20) (i-num 30) (i-num 40))))))
-(test (desugar (parse '{markov {seqn-p C4 D4 E4 F4 G4 A4 B4} 10 {seqn-p E4}}))
-      (i-markov (i-seqn-p (list (i-id 'C4) (i-id 'D4) (i-id 'E4) (i-id 'F4) (i-id 'G4) (i-id 'A4) (i-id 'B4)))
-                (i-num 10)
-                (i-seqn-p (list (i-id 'E4)))))
         
 (define (decode-pitch sym)
   (match sym
