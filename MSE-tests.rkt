@@ -15,12 +15,55 @@
 ;;;;;;;;;;;;;;;;   PARSER tests   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;TODO!
+(test (parse '1) (num 1))
+(test (parse 'c) (id 'c))
+
+;restricted symbols
+;references
+(test (parse 'note) (id 'note))
+(test (parse 'C4) (id 'C4))
+(test (parse 'Cb4) (id 'Cb4))
+(test (parse 'C#4) (id 'C#4))
+(test (parse 'C100) (id 'C100))
+
+
+;binding:
+(test/exn (parse '{with {note 1} 1}) "")
+(test/exn (parse '{with {sequence 1} 1}) "")
+(test/exn (parse '{with {seqn-p 1} 1}) "")
+(test/exn (parse '{with {seq-append 1} 1}) "")
+(test/exn (parse '{with {with 1} 1}) "")
+(test/exn (parse '{with {fun 1} 1}) "")
+(test/exn (parse '{with {interleave 1} 1}) "")
+(test/exn (parse '{with {insert 1} 1}) "")
+(test/exn (parse '{with {transpose 1} 1}) "")
+(test/exn (parse '{with {changeVelocity 1} 1}) "")
+(test/exn (parse '{with {markov 1} 1}) "")
+;pitches
+(test/exn (parse '{with {A4 1} 1}) "")
+(test/exn (parse '{with {B4 1} 1}) "")
+(test/exn (parse '{with {C4 1} 1}) "")
+(test/exn (parse '{with {D4 1} 1}) "")
+(test/exn (parse '{with {E4 1} 1}) "")
+(test/exn (parse '{with {F4 1} 1}) "")
+(test/exn (parse '{with {G4 1} 1}) "")
+(test/exn (parse '{with {Cb4 1} 1}) "")
+(test/exn (parse '{with {C#4 1} 1}) "")
+(test/exn (parse '{with {Cbb4 1} 1}) "")
+(test/exn (parse '{with {C##4 1} 1}) "")
+(test/exn (parse '{with {C10000 1} 1}) "")
 
 ;;;;;;;;;;;;;;;;   DESUGARER tests   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;TODO Test IDs!
+;;ID testing
+;TODO, append cannot be desugared to support ids?
+;or, not desugared when first arg is ID?
+(test (desugar (parse '{with {c {seqn-p C4 C5 C6}}
+                             {seq-append c c}}))
+      "")
+
+
 ;; sequence
 (test (desugar (parse '{sequence {note 40 50 60}}))
       (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60)))))

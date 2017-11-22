@@ -96,6 +96,8 @@
   [mtEnv]
   [anEnv (name symbol?) (value MSE-Value?) (env Env?)])
 
+;; ID's which cannot be used by the user.
+;TODO, update list to include all functions
 (define *reserved-symbols* '(note sequence seq-append with interleave insert transpose markov)) ; defining what the reserved symbols of the system are
 
 
@@ -107,6 +109,7 @@
 ;; Returns whether the given input is a symbol and a valid identifier
 (define (valid-id? sym)
   (and (symbol? sym)
+       ;;TODO: Restrict pitch ids
        (not (member sym *reserved-symbols*))))
 
 ;;parse s-exp -> MSE
@@ -121,13 +124,15 @@
     [(list 'seq-append list1 list2) (seq-append (parse list1) (parse list2))]
     [(list 'with (list (? valid-id? id) value) body) (with id (parse value) (parse body))]
     [(list 'fun (? valid-id? param) body) (fun param (parse body))]
+    ;TODO Explicitly cause invalid-id error for fun and with?
     [(list (and f-expr (? (lambda (s) (not (member s *reserved-symbols*))))) a-expr)
      (app (parse f-expr) (parse a-expr))]
     [(list 'interleave list1 list2) (interleave (parse list1) (parse list2))]
     [(list 'insert list1 list2 index) (insert (parse list1) (parse list2) (parse index))]
     [(list 'transpose list1 add-val) (transpose (parse list1) (parse add-val))]
     [(list 'changeVelocity list1 val) (changeVelocity (parse list1) (parse val))]
-    [(list 'markov seed length initial-note) (markov (parse seed) (parse length) (parse initial-note))]))
+    [(list 'markov seed length initial-note) (markov (parse seed) (parse length) (parse initial-note))]
+    [else (error "Illegal Expression")]))
 
 
 
@@ -147,6 +152,7 @@
                         (desugar d))]
     [sequence (vals) (i-sequence (map desugar vals))]
     [seqn-p (vals) (i-seqn-p (map desugar vals))]
+    ;TODO seq-append support for IDs
     [seq-append (seq1 seq2)
                 (i-insert (desugar seq1)
                         (desugar seq2)
