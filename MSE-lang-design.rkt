@@ -86,7 +86,7 @@
   [velV (vel number?)]
   [durV (dur number?)]
   [noteV (p pitchV?) (vel velV?) (dur durV?)]
-  [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))] ;;Distributions must not be empty
+  [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))]  
   [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
             (body D-MSE?)
             (env Env?)])
