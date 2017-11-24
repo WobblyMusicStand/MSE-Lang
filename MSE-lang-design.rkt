@@ -20,6 +20,7 @@
 ;; MSE = Music Writing Expression
 ;;
 ;; <MSE> ::= <num>
+;;  Proof of Concept Implementation
 ;;     | <id>
 ;;     | {with {<id> <MSE>} <MSE>}     
 ;;     | {fun {<id> <MSE>} <MSE>}
@@ -51,6 +52,7 @@
 ;;                                                  ;     Strictness point, there must be a finite number of notes in ATLEAST ONE OF the given MSEs
 ;;
 ;;  For 100% level only:
+;;     | {markov <MSE> <num> <MSE>?}                ; Runs markov chain (with a depth of 1) as shown in the example above
 ;;
 ;;     | {polyphony <MSE>*}                         ; like sequence, but all elements start at the same time
 ;;                                                  ;  Markov: unsure how to support, TODO
@@ -65,9 +67,24 @@
 ;;     | {set-durs <MSE> <num> <num>?}              ; Takes a sequence of notes and duration and an optional duration-target
 ;;                                                    sets the pitch of all notes to the given pitch. |OR| the pitch of all notes
 ;;                                                    equal to pitch-target to the given pitch
+;;     | {retrograde <MSE>}                         ; Takes a sequence and reverses the order of the elements
+;;     | {invert-pitch <MSE> <num>}                 ; Takes a sequence and a pitch-axis and inverts the existing pitches around that pitch-axis
+;;                                                  ;  Ex {invert-pitch {seqn-p 0 2} 4} => {seqn-p 8 6}
+;;     | {expand <MSE> <num> <id>}                  ; Takes a sequence and a magnitude and a target-parameter flag. Multiplies the target parameter (pitch, vel, dur) by the magnitude
 ;;
-;;     | {markov <MSE> <num> <MSE>?}                ; Runs markov chain (with a depth of 1) as shown in the example above
+;;  Long-term features:
+;;    focus is on export compatability and formating, support for these features may require adjustments to existing constructs/functions
 ;;
+;;
+;;     | {set-channel <MSE> <num>}                  ; Takes an MSE and an channel-number, encapsulates the MSE in a chanel flag specifying the channel id for use when exporting.
+;;                                                    Polyphony may implicity prepend incrementing chanel ID's to all of its contents. (
+
+;;     | {tempo <MSE> <num>}                        ; Takes an MSE and a number of beats per minute, bpm. encapsulates the MSE in a tempo flag specifying the tempo of all beats within
+;;     | {time-sig <MSE> <id>}                      ; Works in cunjunction with tempo, specifies the number of beats per bar and their type for the underlying MSE
+;;     | {key-sig <MSE> <id>}                       ; Encapsulates the MSE in a key-signature flag, specifies which notes to interpret as accidentals when exported to a human-readable format
+;;     | {export <MSE>}                             ; Takes an evaluated MSE, and exports it into a MIDI readable binary file. Uses a post-evaluation parser. VERY LONG TERM
+;;                                                     May have a number of export flags, such as instrument, channel, Yamaha/Roland style pitch-indexing (slightly different +-12)
+;;                                                     to use if not specified by the program
 ;;  TODO, long term more generative functions
 ;;        recurssion.
 
