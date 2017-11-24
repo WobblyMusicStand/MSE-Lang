@@ -27,7 +27,13 @@
 ;;     | {<MSE> <MSE> }                             ; function calls, any time the first symbol is not a reserved word
 ;;
 ;;     | {note <num> <num> <num>}
-;;     | {sequence <MSE>*}                          ; a sequence of notes or sequences each occuring after the previous
+
+;;     | {sequence <MSE>*}             ; a sequence of notes or sequences each occuring after the previous
+;;     | {polyphony <MSE>*}            ; like sequence, but all elements start at the same time
+;;
+;  Markov: unsure how to support, TODO
+;;                                                  ;  Zip: unsure how to support, TODO;;
+
 ;;     | {seqn-p <MSE>*}                            ; seqence constructor using given pitches in number or letter format (e.g. 60 A4 E5)
 ;;     | {seqn-v <MSE>*}                            ; seqence constructor using given velocities in number format (e.g. 60 127)
 ;;     | {seqn-d <MSE>*}                            ; seqence constructor using given duration in letter or number format (e.g. 500 1000)
@@ -67,24 +73,35 @@
 ;;     | {set-durs <MSE> <num> <num>?}              ; Takes a sequence of notes and duration and an optional duration-target
 ;;                                                    sets the pitch of all notes to the given pitch. |OR| the pitch of all notes
 ;;                                                    equal to pitch-target to the given pitch
-;;     | {retrograde <MSE>}                         ; Takes a sequence and reverses the order of the elements
-;;     | {invert-pitch <MSE> <num>}                 ; Takes a sequence and a pitch-axis and inverts the existing pitches around that pitch-axis
-;;                                                  ;  Ex {invert-pitch {seqn-p 0 2} 4} => {seqn-p 8 6}
-;;     | {expand <MSE> <num> <id>}                  ; Takes a sequence and a magnitude and a target-parameter flag. Multiplies the target parameter (pitch, vel, dur) by the magnitude
+
+;;     | {retrograde <MSE>}            ; Takes a sequence and reverses the order of the elements
+;;     | {invert-pitch <MSE> <num>}    ; Takes a sequence and a pitch-axis and inverts the
+;;                                       existing pitches around that pitch-axis
+;;                                       Ex {invert-pitch {seqn-p 0 2} 4} => {seqn-p 8 6}
+;;     | {expand <MSE> <num> <id>}     ; Takes a sequence and a magnitude and a target-parameter flag.
+;;                                       Multiplies the target parameter (pitch, vel, dur) by the magnitude
 ;;
 ;;  Long-term features:
 ;;    focus is on export compatability and formating, support for these features may require adjustments to existing constructs/functions
 ;;
 ;;
-;;     | {set-channel <MSE> <num>}                  ; Takes an MSE and an channel-number, encapsulates the MSE in a chanel flag specifying the channel id for use when exporting.
-;;                                                    Polyphony may implicity prepend incrementing chanel ID's to all of its contents. (
-
-;;     | {tempo <MSE> <num>}                        ; Takes an MSE and a number of beats per minute, bpm. encapsulates the MSE in a tempo flag specifying the tempo of all beats within
-;;     | {time-sig <MSE> <id>}                      ; Works in cunjunction with tempo, specifies the number of beats per bar and their type for the underlying MSE
-;;     | {key-sig <MSE> <id>}                       ; Encapsulates the MSE in a key-signature flag, specifies which notes to interpret as accidentals when exported to a human-readable format
-;;     | {export <MSE>}                             ; Takes an evaluated MSE, and exports it into a MIDI readable binary file. Uses a post-evaluation parser. VERY LONG TERM
-;;                                                     May have a number of export flags, such as instrument, channel, Yamaha/Roland style pitch-indexing (slightly different +-12)
+;;     | {set-channel <MSE> <num>}                  ; Takes an sequence and an channel-number,
+;;                                                    binds the sequence to the channel id for use when exporting.
+;;     | {set-instrument <MSE> <num>}               ; Takes and Sequence and an insturment, binds that sequence to the instrument.
+;;     | {tempo <MSE> <id>}                         ; Takes an Sequence and a number of beats per minute, bpm.
+;;                                                    Binds the sequence the tempo for all beats within
+;;     | {time-sig <MSE> <id>}                      ; Works in cunjunction with tempo, specifies the number of beats
+;;                                                    per bar and their type for the bound sequence
+;;     | {key-sig <MSE> <id>}                       ; Binds the sequence with a key-signature flag, specifies which notes to interpret
+;;                                                    as accidentals when exported to a human-readable format
+;;     | {clef <MSE> <id>}                          ; Binds the sequence to a given clef.
+;;     | {export <MSE>}                             ; Takes an evaluated MSE, and exports it into a MIDI readable binary file.
+;;                                                     Uses a post-evaluation parser. VERY LONG TERM
+;;                                                     May have a number of export flags, such as instrument, channel, 
+;;                                                     Yamaha/Roland style pitch-indexing (slightly different +-12)
 ;;                                                     to use if not specified by the program
+
+
 ;;  TODO, long term more generative functions
 ;;        recurssion.
 
@@ -138,8 +155,23 @@
   [pitchV (pit number?)]
   [velV (vel number?)]
   [durV (dur number?)]
-  [noteV (p pitchV?) (vel velV?) (dur durV?)]
-  [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))] ;;Distributions must not be empty
+  [noteV (p pitchV?)
+         (vel velV?)
+         (dur durV?)]
+  [seqV (clef symbol?)
+        (key symbol?)
+        (time-sig symbol?)
+        (tempo number?)
+        (instrument number?)
+        (channel number?)
+        (values (and/c (listof MSE-Value?) (not/c empty?)))] ;;Distributions must not be empty
+  [polyV (clef symbol?)
+         (key symbol?)
+         (time-sig symbol?)
+         (tempo number?)
+         (instrument number?)
+         (channel number?)
+         (values (and/c (listof MSE-Value?) (not/c empty?)))]
   [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
             (body D-MSE?)
             (env Env?)])
@@ -205,7 +237,7 @@
                         (desugar d))]
     [sequence (vals) (i-sequence (map desugar vals))]
     [seqn-p (vals) (i-seqn-p (map desugar vals))]
-    ;TODO seq-append support for IDs
+    ;TODO seq-append support for IDs, call insert with n = -1? flag for always append at end? if insert takes <=0 for (lis2 lis1) just reverse the order of the sequences and call with -1. also 
     [seq-append (seq1 seq2)
                 (i-insert (desugar seq1)
                         (desugar seq2)
@@ -305,7 +337,7 @@
                                 [else "need a note"]) env)]))
           (define (doInsert lis1 lis2 n)
             (cond [(> n (length lis1)) (append lis1 lis2)]
-                  [(= n 0)(append lis1 lis2)]
+                  [(<= n 0)(append lis2 lis1)] ;put lis2 infront of lis1 
                   [else
                    (cons (first lis1) (doInsert (rest lis1)lis2 (sub1 n)))]))
           (define (tolist seq)
@@ -343,7 +375,7 @@
               [i-transpose (listN value)  (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
               [changeProp (listN value pos) (cond [(= 1 (helper pos env)) (helper (i-sequence (map (lambda (m) (changePit value m env)) (tolist listN))) env)]
                                                 [(= 2 (helper pos env)) (helper (i-sequence (map (lambda (m) (changeVol value m env)) (tolist listN))) env)]
-                                                [(= 3 (helper pos env)) (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env)])]
+                                                [(= 3 (helper pos env)) (helper (i-sequence (map (lambda (m) (changeDur value m env)) (tolist listN))) env)])]
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
 
