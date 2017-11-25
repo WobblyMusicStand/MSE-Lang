@@ -73,7 +73,7 @@
   [i-fun (param symbol?) (body D-MSE?)]
   [i-app (function D-MSE?) (arg D-MSE?)]
   [i-interleave (list1 D-MSE?) (list2 D-MSE?)]
-  [i-insert (list1 D-MSE?)(list2 D-MSE?)(index i-num?)]
+  [i-insert (list1 D-MSE?)(list2 D-MSE?)(index D-MSE?)]
   [i-transpose (list1 D-MSE?)(add-val i-num?)]
   [changeProp (list1 D-MSE?) (val i-num?) (pos i-num?)]
   [i-markov (seed D-MSE?)(length i-num?)(initial-note D-MSE?)]
