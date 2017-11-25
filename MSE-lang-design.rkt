@@ -231,34 +231,34 @@
 
   ;;interp D-MSE -> MSE-Value
   (define (interp d-mse)
-   (local [(define (transOne val m env)
-            (type-case D-MSE m
-              [i-note (p v d)  (i-note (i-num (+ (helper val env) (helper p env))) v d)]
+  (local [(define (transOne val m env)
+            (type-case MSE-Value m
+              [noteV (p v d)  (noteV (+ (helper val env) (helper p env)) v d)]
               [else (transOne val
                               (type-case MSE-Value (helper m env)
-                                [noteV (p v d) (i-note p v d)]
+                                [noteV (p v d) (noteV p v d)]
                                 [else "need a note"]) env)]))
           (define (changeVol val m env)
-            (type-case D-MSE m
-              [i-note (p v d)  (i-note p val d)]
+            (type-case MSE-Value m
+              [noteV (p v d)  (noteV p val d)]
               [else (changeVol val
-                              (type-case MSE-Value (helper m env)
-                                [noteV (p v d) (i-note p v d)]
-                                [else "need a note"]) env)]))
+                               (type-case MSE-Value (helper m env)
+                                 [noteV (p v d) (noteV p v d)]
+                                 [else "need a note"]) env)]))
           (define (changePit val m env)
-            (type-case D-MSE m
-              [i-note (p v d)  (i-note val v d)]
+            (type-case MSE-Value m
+              [noteV (p v d)  (noteV val v d)]
               [else (changePit val
-                              (type-case MSE-Value (helper m env)
-                                [noteV (p v d) (i-note p v d)]
-                                [else "need a note"]) env)]))
+                               (type-case MSE-Value (helper m env)
+                                 [noteV (p v d) (noteV p v d)]
+                                 [else "need a note"]) env)]))
           (define (changeDur val m env)
-            (type-case D-MSE m
-              [i-note (p v d)  (i-note p v val)]
+            (type-case MSE-Value m
+              [noteV (p v d)  (noteV p v val)]
               [else (changeDur val
-                              (type-case MSE-Value (helper m env)
-                                [noteV (p v d) (i-note p v d)]
-                                [else "need a note"]) env)]))
+                               (type-case MSE-Value (helper m env)
+                                 [noteV (p v d) (noteV p v d)]
+                                 [else "need a note"]) env)]))
           (define (doInsert lis1 lis2 n)
             (cond [(> n (length lis1)) (append lis1 lis2)]
                   [(= n 0)(append lis1 lis2)]
@@ -275,12 +275,13 @@
             (type-case D-MSE seq
               [i-sequence (l) l]
               [i-seqn-p (l) (map (lambda (sym) (i-note (i-num (interp sym))
-                                               (i-num 10)  (i-num 10))) l)]
+                                                       (i-num 10)  (i-num 10))) l)]
+              ;[i-id (name) (tolist (lookup name env) env)
               [else (error "need a sequence")]))
           (define (tolist2 seq)
             (type-case MSE-Value seq
               [seqV (l) l]
-              [else (error "need a seqV")]))
+              [else (error "need a seqnV")]))
           (define (inter lis1 lis2)
             (cond [(empty? lis1) lis2]
                   [(empty? lis2) lis1]
@@ -292,28 +293,27 @@
             (type-case D-MSE expr
               [i-num (n) n]
               [i-note (p v d) (noteV (pitchV (helper p env))
-                                   (velV (helper v env) )
-                                   (durV (helper d env)))]
+                                     (velV (helper v env) )
+                                     (durV (helper d env)))]
               [i-id  (name)  (lookup name env)]
               [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
               [i-seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
-                                                           (velV  10)
-                                                           (durV  10))) syms))]
+                                                               (velV  10)
+                                                               (durV  10))) syms))]
               [i-fun (arg-name body) (closureV arg-name body env)]
               [i-app (fun-expr arg-expr)
-                   (local ([define fun-val (helper fun-expr env)]
-                           [define arg-val (helper arg-expr env)])
-                     (helper (closureV-body fun-val)
-                             (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
-              [i-interleave (l1 l2) (helper (i-sequence (inter (tolist l1) (tolist l2))) env)]
+                     (local ([define fun-val (helper fun-expr env)]
+                             [define arg-val (helper arg-expr env)])
+                       (helper (closureV-body fun-val)
+                               (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
+              [i-interleave (l1 l2) (seqV (inter (tolist2 (helper l1 env)) (tolist2 (helper l2 env))))]
               [i-insert (l1 l2 index) (seqV (doInsert (tolist2  (helper l1 env) ) (tolist2  (helper l2 env)) (readIndex index env)))]
-              [i-transpose (listN value)  (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
-              [changeProp (listN value pos) (cond [(= 1 (helper pos env)) (helper (i-sequence (map (lambda (m) (changePit value m env)) (tolist listN))) env)]
-                                                [(= 2 (helper pos env)) (helper (i-sequence (map (lambda (m) (changeVol value m env)) (tolist listN))) env)]
-                                                [(= 3 (helper pos env)) (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env)])]
+              [i-transpose (listN value)  (seqV (map (lambda (m) (transOne value m env)) (tolist2 listN))) ]
+              [changeProp (listN value pos) (cond [(= 1 (helper pos env)) (seqV (map (lambda (m) (changePit value m env)) (tolist2 listN)))]
+                                                  [(= 2 (helper pos env)) (seqV  (map (lambda (m) (changeVol value m env)) (tolist2 listN)))]
+                                                  [(= 3 (helper pos env)) (seqV (map (lambda (m) (transOne value m env)) (tolist2 listN)))])]
               [else "NO!!!"]))]
-      (helper d-mse (mtEnv))))
-
+    (helper d-mse (mtEnv))))
 
   ;;Run MSE -> MSE-Value
   ;;Interprets the result of desugaring the parse s-expression
