@@ -168,10 +168,11 @@
       [seq-append (seq1 seq2)
                   (i-insert (desugar seq1)
                             (desugar seq2)
-                            (i-num (length (type-case MSE seq1
-                                             [sequence (s) (i-sequence-values (desugar seq1))]
-                                             [seqn-p (s) (i-seqn-p-values (desugar seq1))]
-                                             [else (error "need a sequence or seqn-p")]))))] 
+                            (type-case MSE seq1
+                                             [sequence (s) (i-num (length (i-sequence-values (desugar seq1))))]
+                                             [seqn-p (s) (i-num (length (i-seqn-p-values (desugar seq1))))]
+                                             [id (var) (desugar seq1)]
+                                             [else (error "need a sequence or seqn-p")]))] 
       [with (id named-expr body) (desugar (app (fun id body) named-expr))]
       [fun (param body) (i-fun param (desugar body))]
       [app (fn-exp arg-exp) (i-app (desugar fn-exp)
@@ -263,12 +264,23 @@
                   [(= n 0)(append lis1 lis2)]
                   [else
                    (cons (first lis1) (doInsert (rest lis1)lis2 (sub1 n)))]))
+          (define (readIndex var env)
+            (type-case D-MSE var
+              [i-id (v) (type-case MSE-Value (lookup v env)
+                          [seqV (l) (length l)]
+                          [else (error "need a seqnV")])]
+              [i-num (n) n]
+              [else (error "need a num or an id")]))
           (define (tolist seq)
             (type-case D-MSE seq
               [i-sequence (l) l]
               [i-seqn-p (l) (map (lambda (sym) (i-note (i-num (interp sym))
                                                (i-num 10)  (i-num 10))) l)]
               [else (error "need a sequence")]))
+          (define (tolist2 seq)
+            (type-case MSE-Value seq
+              [seqV (l) l]
+              [else (error "need a seqV")]))
           (define (inter lis1 lis2)
             (cond [(empty? lis1) lis2]
                   [(empty? lis2) lis1]
@@ -294,7 +306,7 @@
                      (helper (closureV-body fun-val)
                              (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
               [i-interleave (l1 l2) (helper (i-sequence (inter (tolist l1) (tolist l2))) env)]
-              [i-insert (l1 l2 index) (helper (i-sequence (doInsert (tolist  l1 ) (tolist  l2) (helper index env))) env)]
+              [i-insert (l1 l2 index) (seqV (doInsert (tolist2  (helper l1 env) ) (tolist2  (helper l2 env)) (readIndex index env)))]
               [i-transpose (listN value)  (helper (i-sequence (map (lambda (m) (transOne value m env)) (tolist listN))) env) ]
               [changeProp (listN value pos) (cond [(= 1 (helper pos env)) (helper (i-sequence (map (lambda (m) (changePit value m env)) (tolist listN))) env)]
                                                 [(= 2 (helper pos env)) (helper (i-sequence (map (lambda (m) (changeVol value m env)) (tolist listN))) env)]
