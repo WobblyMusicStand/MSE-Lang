@@ -284,6 +284,7 @@
                   [(= n 0)(append lis1 lis2)]
                   [else
                    (cons (first lis1) (doInsert (rest lis1)lis2 (sub1 n)))]))
+          
           (define (readIndex var env)
             (type-case D-MSE var
               [i-id (v) (type-case MSE-Value (lookup v env)
@@ -291,6 +292,7 @@
                           [else (error "need a seqnV")])]
               [i-num (n) n]
               [else (error "need a num or an id")]))
+          
           (define (tolist seq)
             (type-case D-MSE seq
               [i-sequence (l) l]
@@ -298,6 +300,7 @@
               ;         (i-num 10)  (i-num 10))) l)]
               ;[i-id (name) (tolist (lookup name env) env)
               [else (error "need a sequence")]))
+          
           (define (tolist2 seq)
             (type-case MSE-Value seq
               [seqV (l) l]
@@ -337,8 +340,8 @@
               [i-insert (l1 l2 index) (seqV (doInsert (tolist2  (helper l1 env) ) (tolist2  (helper l2 env)) (readIndex index env)))]
               [i-transpose (listN value)  (seqV (map (lambda (m) (transOne value m env)) (tolist2 (helper listN env)))) ]
               [changeProp (prop listN value) (cond [(eq? prop 'p) (seqV (map (lambda (m) (changePit value m env)) (tolist2 (helper listN env))))]
-                                                   [(eq? prop 'v) (seqV  (map (lambda (m) (changeVol value m env)) (tolist2 (helper listN env))))]
-                                                   [(eq? prop 'd) (seqV (map (lambda (m) (transOne value m env)) (tolist2 (helper listN env))))])]
+                                                   [(eq? prop 'v) (seqV (map (lambda (m) (changeVol value m env)) (tolist2 (helper listN env))))]
+                                                   [(eq? prop 'd) (seqV (map (lambda (m) (changeDur value m env)) (tolist2 (helper listN env))))])]
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
 

@@ -65,7 +65,7 @@
 ;;ID testing
 ;TODO, append cannot be desugared to support ids?
 ;or, not desugared when first arg is ID?
-(test (desugar (parse '{with {c {seqn-p C4 C5 C6}}
+#;(test (desugar (parse '{with {c {seqn-p C4 C5 C6}}
                              {seq-append c c}}))
       "")
 ;;wtf is this solution, just remove desugaring for inserts. fml
@@ -87,7 +87,7 @@
 (test (desugar (parse '(seqn-d 1000 0 100000)))
       (i-seqn 'd (list (i-num 1000) (i-num 0) (i-num 100000))))
 
-;; happy birthday
+;; happy birthday pitch sequence
 (test (desugar (parse '(seqn-p A4 A4 B4 A4 D5 C#5 A4 A4 B4 A4 E5 D5 A4 A4 A5 F#5 D5 C#5 B4 G5 G5 F#5 D5 E5 D5 )))
       (i-seqn 'p
               (list
@@ -165,10 +165,22 @@
 (test (desugar (parse '{transpose {seqn-p A4} 23}))
       (i-transpose (i-seqn 'p (list (i-id 'A4))) (i-num 23)))
 ;; changeVelocity
+(test (desugar (parse '{changePits {sequence {note 10 20 30}} 40}))
+      (changeProp 'p (i-sequence (list (i-note (i-num 10) (i-num 20) (i-num 30)))) (i-num 40)))
+(test (desugar (parse '{changePits {seqn-p C4 C4 G4 G4} 7}))
+      (changeProp 'p (i-seqn 'p (list (i-id 'C4) (i-id 'C4) (i-id 'G4) (i-id 'G4))) (i-num 7)))
+
 (test (desugar (parse '{changeVels {sequence {note 10 20 30}} 40}))
       (changeProp 'v (i-sequence (list (i-note (i-num 10) (i-num 20) (i-num 30)))) (i-num 40)))
-(test (desugar (parse '{changeVels {seqn-p C4 C4 G4 G4} 7}))
-      (changeProp 'v (i-seqn 'p (list (i-id 'C4) (i-id 'C4) (i-id 'G4) (i-id 'G4))) (i-num 7)))
+(test (desugar (parse '{changeVels {seqn-v 50 60 70 80} 7}))
+      (changeProp 'v (i-seqn 'v (list (i-num 50) (i-num 60) (i-num 70) (i-num 80))) (i-num 7)))
+
+(test (desugar (parse '{changeDurs {sequence {note 10 20 30}} 40}))
+      (changeProp 'd (i-sequence (list (i-note (i-num 10) (i-num 20) (i-num 30)))) (i-num 40)))
+(test (desugar (parse '{changeDurs {seqn-d 0 10 100 1000} 7}))
+      (changeProp 'd (i-seqn 'd (list (i-num 0) (i-num 10) (i-num 100) (i-num 1000))) (i-num 7)))
+
+
 ;; markov
 (test  (desugar (parse '{markov
                          {sequence {note 20 30 40}
@@ -223,7 +235,7 @@
 
 
 
-;; seqn-x s
+;; seqn-xs
 (test (run '(seqn-p C4 C5 C6))
       (seqV (list
              (noteV (pitchV 48) (velV 10) (durV 10))
@@ -240,13 +252,22 @@
              (noteV (pitchV 0) (velV 10) (durV 0))
              (noteV (pitchV 0) (velV 10) (durV 100000)))))
 
+;;changeProps
+(test (run '{changePits {sequence {note 10 20 30}} 40})
+      (seqV (list (noteV (pitchV 40) (velV 20) (durV 30)))))
+
+(test (run '{changeVels {sequence {note 10 20 30}} 40})
+      (seqV (list (noteV (pitchV 10) (velV 40) (durV 30)))))
+
+(test (run '{changeDurs {sequence {note 10 20 30}} 40})
+      (seqV (list (noteV (pitchV 10) (velV 20) (durV 40)))))
 
 
 (test (run '{with {c {sequence {note 10 20 30}}}
                   c})
       (seqV (list (noteV (pitchV 10) (velV 20) (durV 30)))))
 
-(test (run '(interleave (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
+(test (run '{interleave {sequence {note 10 20 30} {note 20 20 20}} {sequence {note 30 20 10} {note 30 30 30}}})
       (seqV
        (list
         (noteV (pitchV 10) (velV 20) (durV 30))
