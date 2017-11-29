@@ -63,12 +63,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;ID testing
-;TODO, append cannot be desugared to support ids?
-;or, not desugared when first arg is ID?
-#;(test (desugar (parse '{with {c {seqn-p C4 C5 C6}}
-                               {seq-append c c}}))
-        "")
-;;wtf is this solution, just remove desugaring for inserts. fml
+(test (desugar (parse '{with {c {seqn-p C4 C5 C6}}
+                             {seq-append c c}}))
+      (i-app
+       (i-fun 'c (i-insert (i-id 'c) (i-id 'c) (i-num -1)))
+       (i-seqn 'p (list (i-id 'C4) (i-id 'C5) (i-id 'C6)))))
 
 
 ;; sequence
@@ -180,6 +179,11 @@
 (test (desugar (parse '{changeDurs {seqn-d 0 10 100 1000} 7}))
       (changeProp 'd (i-seqn 'd (list (i-num 0) (i-num 10) (i-num 100) (i-num 1000))) (i-num 7)))
 
+;;zip
+(test (desugar (parse '{zip {sequence {note 1 1 1}} {sequence {note 2 2 2}} {sequence {note 3 3 3}}}))
+      (i-zip (i-sequence (list (i-note (i-num 1) (i-num 1) (i-num 1))))
+             (i-sequence (list (i-note (i-num 2) (i-num 2) (i-num 2))))
+             (i-sequence (list (i-note (i-num 3) (i-num 3) (i-num 3))))))
 
 ;; markov
 (test  (desugar (parse '{markov
@@ -198,6 +202,8 @@
       (i-markov (i-seqn 'p (list (i-id 'C4) (i-id 'D4) (i-id 'E4) (i-id 'F4) (i-id 'G4) (i-id 'A4) (i-id 'B4)))
                 (i-num 10)
                 (i-seqn 'p (list (i-id 'E4)))))
+
+
 
 
 
@@ -238,13 +244,13 @@
 (test (run '{note 1 2 3})
       (noteV (pitchV 1) (velV 2) (durV 3)))
 
-(test (run '{note A1 2 3}) ;note must expect MSE
-      (noteV (pitchV 21) (velV 2) (durV 3)))
+#;(test (run '{note A1 2 3}) ;note must expect MSE
+        (noteV (pitchV 21) (velV 2) (durV 3)))
 
 
 
-(test/exn (run '{note {note 1 2 3} A1 3})
-          "") ;pitchV expects numbers
+#;(test/exn (run '{note {note 1 2 3} A1 3})
+            "") ;pitchV expects numbers
 
 ;; seqn-xs
 (test (run '(seqn-p C4 C5 C6))
@@ -295,41 +301,67 @@
 
 ;;append
 (test (run '(seq-append (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
-      (seqV
-       (list
-        (noteV (pitchV 10) (velV 20) (durV 30))
-        (noteV (pitchV 20) (velV 20) (durV 20))
-        (noteV (pitchV 30) (velV 20) (durV 10))
-        (noteV (pitchV 30) (velV 30) (durV 30)))))
+      (seqV (list
+             (noteV (pitchV 10) (velV 20) (durV 30))
+             (noteV (pitchV 20) (velV 20) (durV 20))
+             (noteV (pitchV 30) (velV 20) (durV 10))
+             (noteV (pitchV 30) (velV 30) (durV 30)))))
 
 ;;insert
 (test (run '{insert {seqn-p C4 C4} {seqn-p C5 C5} 0})
-      (seqV
-       (list
-        (noteV (pitchV 48) (velV 10) (durV 10))
-        (noteV (pitchV 48) (velV 10) (durV 10))
-        (noteV (pitchV 60) (velV 10) (durV 10))
-        (noteV (pitchV 60) (velV 10) (durV 10)))))
+      (seqV (list
+             (noteV (pitchV 48) (velV 10) (durV 10))
+             (noteV (pitchV 48) (velV 10) (durV 10))
+             (noteV (pitchV 60) (velV 10) (durV 10))
+             (noteV (pitchV 60) (velV 10) (durV 10)))))
 
 (test (run '{insert {seqn-p C4 C4} into {seqn-p C5 C5} at 1})
-      (seqV
-       (list
-        (noteV (pitchV 60) (velV 10) (durV 10))
-        (noteV (pitchV 48) (velV 10) (durV 10))
-        (noteV (pitchV 48) (velV 10) (durV 10))
-        (noteV (pitchV 60) (velV 10) (durV 10)))))
+      (seqV (list
+             (noteV (pitchV 60) (velV 10) (durV 10))
+             (noteV (pitchV 48) (velV 10) (durV 10))
+             (noteV (pitchV 48) (velV 10) (durV 10))
+             (noteV (pitchV 60) (velV 10) (durV 10)))))
 
 (test (run '{insert {seqn-p C4 C4} {seqn-p C5 C5} 2})
-      (seqV
-       (list
-        (noteV (pitchV 60) (velV 10) (durV 10))
-        (noteV (pitchV 60) (velV 10) (durV 10))
-        (noteV (pitchV 48) (velV 10) (durV 10))
-        (noteV (pitchV 48) (velV 10) (durV 10)))))
+      (seqV (list
+             (noteV (pitchV 60) (velV 10) (durV 10))
+             (noteV (pitchV 60) (velV 10) (durV 10))
+             (noteV (pitchV 48) (velV 10) (durV 10))
+             (noteV (pitchV 48) (velV 10) (durV 10)))))
 
 (test/exn (run '{with {i 2} {insert {seqn-p C4 C4} {seqn-p C5 C5} i}})
-      "") ;indexes must be provided as numbers, not variables
+          "") ;indexes must be provided as numbers, not variables
 
+;;zip
+(test (run '{zip {sequence {note 1 1 1}} {sequence {note 2 2 2}} {sequence {note 3 3 3}}})
+      (seqV (list
+             (noteV (pitchV 1) (velV 2) (durV 3)))))
+
+(test (run '{zip {sequence {note 1 1 1} {note 1 1 1}} {sequence {note 2 2 2} {note 2 2 2}} {sequence {note 3 3 3} {note 3 3 3}}})
+      (seqV (list
+             (noteV (pitchV 1) (velV 2) (durV 3))
+             (noteV (pitchV 1) (velV 2) (durV 3)))))
+
+;;TODO
+(test (run '{zip {sequence {note 1 1 1}} {sequence {note 2 2 2} {note 2 2 2}} {sequence {note 3 3 3} {note 3 3 3}}})
+      (seqV (list
+             (noteV (pitchV 1) (velV 2) (durV 3)))))
+
+(test (run '{zip {seqn-p C4 D4 E4 F4 G4 A4 B4 C5} {seqn-v 40 45 50 55 60 65 70 75} {seqn-d 1000 1000 1000 1000 1000 1000 1000 1000}})
+      (seqV (list
+             (noteV (pitchV 48) (velV 40) (durV 1000))
+             (noteV (pitchV 50) (velV 45) (durV 1000))
+             (noteV (pitchV 52) (velV 50) (durV 1000))
+             (noteV (pitchV 53) (velV 55) (durV 1000))
+             (noteV (pitchV 55) (velV 60) (durV 1000))
+             (noteV (pitchV 57) (velV 65) (durV 1000))
+             (noteV (pitchV 59) (velV 70) (durV 1000))
+             (noteV (pitchV 60) (velV 75) (durV 1000)))))
+
+;;A sequence zipped with itself returns a new equivalent sequence
+(test (run '{with {s {seqn-p C4 D4 E4 F4 G4 A4 B4 C5}}
+                  {zip s s s}})
+      (run '{seqn-p C4 D4 E4 F4 G4 A4 B4 C5}))
 
 
 

@@ -65,6 +65,7 @@
   [changePits (list1 MSE?) (val num?)]
   [changeVels (list1 MSE?) (val num?)]
   [changeDurs (list1 MSE?) (val num?)]
+  [zip (pList MSE?) (vList MSE?) (dList MSE?)]
   [markov (seed MSE?) (length num?) (initial-note MSE?)] ; initial-note has to evaluate to a note
   )
 
@@ -82,6 +83,7 @@
   [i-insert (list1 D-MSE?)(list2 D-MSE?)(index D-MSE?)]
   [i-transpose (list1 D-MSE?)(add-val i-num?)]
   [changeProp (prop symbol?) (list1 D-MSE?) (val i-num?)]
+  [i-zip (pList D-MSE?) (vList D-MSE?) (dList D-MSE?)]
   [i-markov (seed D-MSE?)(length i-num?)(initial-note D-MSE?)]
   )
 
@@ -91,7 +93,7 @@
   [pitchV (pit number?)]
   [velV (vel number?)]
   [durV (dur number?)]
-  [noteV (p pitchV?) (vel velV?) (dur durV?)]
+  [noteV (pit pitchV?) (vel velV?) (dur durV?)]
   [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))]  
   [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
             (body D-MSE?)
@@ -117,7 +119,8 @@
                              transpose
                              changePits
                              changeVels
-                             changeDurs                           
+                             changeDurs
+                             zip
                              markov)) ; defining what the reserved symbols of the system are
 
 
@@ -148,8 +151,7 @@
     [(list 'seq-append list1 list2) (seq-append (parse list1) (parse list2))]
     [(list 'with (list (? valid-id? id) value) body) (with id (parse value) (parse body))]
     [(list 'fun (? valid-id? param) body) (fun param (parse body))]
-    ;TODO Explicitly cause invalid-id error for fun and with?
-    [(list (and f-expr (? (lambda (s) (not (member s *reserved-symbols*))))) a-expr)
+    [(list (and f-expr (? (lambda (s) (not (member s *reserved-symbols*))))) a-expr)   ;TODO Explicitly cause invalid-id error for fun and with?
      (app (parse f-expr) (parse a-expr))]
     [(list 'interleave list1 list2) (interleave (parse list1) (parse list2))]
     [(list 'interleave list1 into list2) (interleave (parse list1) (parse list2))] ;explicit version of interleave
@@ -159,6 +161,7 @@
     [(list 'changePits list1 val) (changePits (parse list1) (parse val))]
     [(list 'changeVels list1 val) (changeVels (parse list1) (parse val))]
     [(list 'changeDurs list1 val) (changeDurs (parse list1) (parse val))]
+    [(list 'zip pL vL dL) (zip (parse pL) (parse vL) (parse dL))]
     [(list 'markov seed length initial-note) (markov (parse seed) (parse length) (parse initial-note))]
     [else (error "Illegal Expression")]))
 
@@ -199,6 +202,7 @@
     [changePits (list1 val) (changeProp 'p (desugar list1) (desugar val))]
     [changeVels (list1 val) (changeProp 'v (desugar list1) (desugar val))]
     [changeDurs (list1 val) (changeProp 'd (desugar list1) (desugar val))]
+    [zip (pL vL dL) (i-zip  (desugar pL) (desugar vL) (desugar dL))]
     [markov (s lth ini)
             (i-markov (desugar s)(desugar lth)(desugar ini))]
     ))
@@ -343,6 +347,12 @@
               [changeProp (prop listN value) (cond [(eq? prop 'p) (seqV (map (lambda (m) (changePit value m env)) (tolist2 (helper listN env))))]
                                                    [(eq? prop 'v) (seqV (map (lambda (m) (changeVol value m env)) (tolist2 (helper listN env))))]
                                                    [(eq? prop 'd) (seqV (map (lambda (m) (changeDur value m env)) (tolist2 (helper listN env))))])]
+              [i-zip (pL vL dL) (seqV (map (lambda (p v d) (noteV (noteV-pit p)
+                                                                  (noteV-vel v)
+                                                                  (noteV-dur d)))
+                                           (tolist2 (helper pL env))
+                                           (tolist2 (helper vL env))
+                                           (tolist2 (helper dL env))))] ;;TODO list size checking for map, all must be the same length
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
 
