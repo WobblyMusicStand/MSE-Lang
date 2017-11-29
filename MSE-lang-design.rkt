@@ -24,18 +24,21 @@
 ;;     | {note <MSE> <num> <num>}
 ;;     | {sequence <MSE>*}
 ;;     | {seqn-p <MSE>*}                            ; A list of given notes in letter format (e.g. A4 E5)
-;;     | {seqn-v <MSE>*}
-;;     | {seqn-d <MSE>*}  
+;;     | {seqn-v <MSE>*}                            ; A list of notes' velocities
+;;     | {seqn-d <MSE>*}                            ; A list of notes' durations
 ;;     | {seq-append <MSE> to <MSE>}                ; Appends the 2nd MSE Expression to
 ;;                                                    the end of the first
 ;;     | {with {<id> <MSE>} <MSE>}     
 ;;     | {fun {<id> <MSE>} <MSE>}
 ;;     | {<MSE> <MSE> }                             ; function calls, any time the first symbol is not a reserved word
 ;;     | {interleave <MSE> into <MSE>}              ; Takes first element of 1st MSE, appends to 1st element of 2nd MSE ... 
-;;     | {insert <MSE> in <MSE> at <num>}        ; Inserts MSE in MSE at index number
-;;     | {transpose <MSE> <num>}                 ; Takes a sequence of notes and a number, and
+;;     | {insert <MSE> in <MSE> at <num>}           ; Inserts MSE in MSE at index number
+;;     | {transpose <MSE> <num>}                    ; Takes a sequence of notes and a number, and
 ;;                                                    adds that number to the pitch of all notes in the sequence
-;;     | {markov <MSE> <num> <MSE>?}             ; Runs markov chain (with a depth of 1) as shown in the example above
+;;     | {changePits <MSE> <num>}                    ; change pitches of all notes in the sequence to the given number
+;;     | {changeVels <MSE> <num>}                    ; change velocities of all notes in the sequence to the given number
+;;     | {changeDurs <MSE> <num>}                    ; change durations of all notes in the sequence to the given number
+;;     | {markov <MSE> <num> <MSE>?}                ; Runs markov chain (with a depth of 1) as shown in the example above
 
 ; Note Message is 3 bytes
 ; Pitch (0 - 127)
