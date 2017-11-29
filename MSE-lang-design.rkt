@@ -257,8 +257,8 @@
   (local [(define (transOne val m env)
             (type-case MSE-Value m
               [noteV (p v d)  (noteV (pitV (+ (helper val env) (type-case MSE-Value p
-                                                                   [pitV (n) n]
-                                                                   [else (error "need a pitch")]))) v d)]
+                                                                 [pitV (n) n]
+                                                                 [else (error "need a pitch")]))) v d)]
               [else (transOne val
                               (type-case MSE-Value (helper m env)
                                 [noteV (p v d) (noteV p v d)]
@@ -296,13 +296,30 @@
               [seqV (l) l]
               [else (error "need a seqV")]))
           
-          (define (inter lis1 lis2)
+          (define (interl lis1 lis2)
             (cond [(empty? lis1) lis2]
                   [(empty? lis2) lis1]
                   [else (cons (first lis1)
                               (cons (first lis2)
-                                    (inter (rest lis1) (rest lis2))))]))
-          ;(define (markov lis 
+                                    (interl (rest lis1) (rest lis2))))]))
+          
+          ;zip should call map on m elements of each list, where m is the length of the shortes list.
+         
+          (define (shorten pL vL dL) (local [(define-values (lpL lvL ldL) (values (length pL) (length vL) (length dL)))
+                                             (define-values (shortestL) (if (< lpL lvL) ;pitch < vel?
+                                                                           (if (< lpL ldL) ;pitch < dur?
+                                                                               lpL ;then pitch
+                                                                               ldL) ;else dur
+                                                                           (if (< lvL ldL) ;vel < dur?
+                                                                               lvL ;vel
+                                                                               ldL)))] ;else dur
+                                       (if (= lpL lvL ldL)
+                                           (values pL vL dL)
+                                           (values (take pL shortestL)
+                                                   (take vL shortestL)
+                                                   (take dL shortestL)))))
+          
+          ;(define (markovlist ...)) TODO
           (define (helper expr env)
             (type-case D-MSE expr
               [i-num (n) n]
@@ -335,18 +352,22 @@
                              [define arg-val (helper arg-expr env)])
                        (helper (closureV-body fun-val)
                                (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
-              [i-interleave (l1 l2) (seqV (inter (tolist (helper l1 env)) (tolist (helper l2 env))))]
+              [i-interleave (l1 l2) (seqV (interl (tolist (helper l1 env)) (tolist (helper l2 env))))]
               [i-insert (l1 l2 index) (seqV (doInsert (tolist  (helper l1 env) ) (tolist  (helper l2 env)) (helper index env)))]
               [i-transpose (listN value)  (seqV (map (lambda (m) (transOne value m env)) (tolist (helper listN env)))) ]
               [changeProp (prop listN value) (cond [(eq? prop 'p) (seqV (map (lambda (m) (changePit value m env)) (tolist (helper listN env))))]
                                                    [(eq? prop 'v) (seqV (map (lambda (m) (changeVol value m env)) (tolist (helper listN env))))]
                                                    [(eq? prop 'd) (seqV (map (lambda (m) (changeDur value m env)) (tolist (helper listN env))))])]
-              [i-zip (pL vL dL) (seqV (map (lambda (p v d) (noteV (noteV-pit p)
-                                                                  (noteV-vel v)
-                                                                  (noteV-dur d)))
-                                           (tolist (helper pL env))
-                                           (tolist (helper vL env))
-                                           (tolist (helper dL env))))] ;;TODO list size checking for map, all must be the same length
+              [i-zip (pL vL dL) (local [(define-values (spL svL sdL) ;Get the first m elements of each list, where m is the length of the shortest list
+                                          (shorten (tolist (helper pL env))
+                                                   (tolist (helper vL env))
+                                                   (tolist (helper dL env))))]
+                                  (seqV (map (lambda (p v d)
+                                               (noteV (noteV-pit p) ;pitches from the 1st list
+                                                      (noteV-vel v) ;vels from the 2nd
+                                                      (noteV-dur d))) ;durs from the 3rd
+                                             spL svL sdL)))]
+              ;[i-markov ...] TODO
               [else "NO!!!"]))]
     ;Trampoline into interp, set the defualt Pitch, Velocity and Duration to O unless overridden
     (helper d-mse (anEnv 'DPIT 0 (anEnv 'DVEL 0 (anEnv 'DDUR 0 (mtEnv)))))))

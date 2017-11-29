@@ -364,7 +364,7 @@
              (noteV (pitV 1) (velV 2) (durV 3))
              (noteV (pitV 1) (velV 2) (durV 3)))))
 
-;;TODO
+
 (test (run '{zip {sequence {note 1 1 1}} {sequence {note 2 2 2} {note 2 2 2}} {sequence {note 3 3 3} {note 3 3 3}}})
       (seqV (list
              (noteV (pitV 1) (velV 2) (durV 3)))))
@@ -379,6 +379,8 @@
              (noteV (pitV 57) (velV 65) (durV 1000))
              (noteV (pitV 59) (velV 70) (durV 1000))
              (noteV (pitV 60) (velV 75) (durV 1000)))))
+
+;;sequences can not be empty => no test for zip empty sequence
 
 ;;A sequence zipped with itself returns a new equivalent sequence
 (test (run '{with {s {seqn-p C4 D4 E4 F4 G4 A4 B4 C5}}
