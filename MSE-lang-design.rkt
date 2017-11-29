@@ -226,11 +226,8 @@
        ['("G") 7]
        ['("A") 9]
        ['("B") 11])
-     (match (regexp-match #rx"b|#" (symbol->string sym))
-       ;;TODO, cound number of b or # and multiply by +-1
-       ['("b") -1]
-       ['("#") 1]
-       [else 0])
+     (+ (* -1 (length (indexes-of (regexp-split #rx" *" (symbol->string sym)) "b")))
+        (length (indexes-of (regexp-split #rx" *" (symbol->string sym)) "#")))
      (* (string->number (first (regexp-match #rx"[0-9]+" (symbol->string sym)))) 12)))
          
 
@@ -307,12 +304,12 @@
          
           (define (shorten pL vL dL) (local [(define-values (lpL lvL ldL) (values (length pL) (length vL) (length dL)))
                                              (define-values (shortestL) (if (< lpL lvL) ;pitch < vel?
-                                                                           (if (< lpL ldL) ;pitch < dur?
-                                                                               lpL ;then pitch
-                                                                               ldL) ;else dur
-                                                                           (if (< lvL ldL) ;vel < dur?
-                                                                               lvL ;vel
-                                                                               ldL)))] ;else dur
+                                                                            (if (< lpL ldL) ;pitch < dur?
+                                                                                lpL ;then pitch
+                                                                                ldL) ;else dur
+                                                                            (if (< lvL ldL) ;vel < dur?
+                                                                                lvL ;vel
+                                                                                ldL)))] ;else dur
                                        (if (= lpL lvL ldL)
                                            (values pL vL dL)
                                            (values (take pL shortestL)

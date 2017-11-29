@@ -228,10 +228,11 @@
 (test (run 'C0) 0)
 (test (run 'C10) 120)
 
-;(test (run 'Cbb4) 46)
-;(test (run 'C##4) 50)
-;(test (run 'Cb#4) 48)
-;(test (run 'C#b4) 48)
+(test (run 'Cbb4) 46)
+(test (run 'C##4) 50)
+(test (run 'Cb#4) 48)
+(test (run 'C#b4) 48)
+(test (run 'Cbbbbbbbbbbbb4) 36)
 
 (test/exn (run 'B-1) "") ;out of range
 (test/exn (run 'C) "")   ;no octave
