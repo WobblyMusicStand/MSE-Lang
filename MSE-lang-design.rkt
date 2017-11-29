@@ -289,26 +289,8 @@
                   [(<= n 0)(append lisS lisD)] ;if index is <0, append destination to the end of source 
                   [else
                    (cons (first lisD) (doInsert lisS (rest lisD) (sub1 n)))])) ;else iterate over the elements in destination until index is reached
-
-          ;REMOVE
-          #;(define (readIndex var env)
-            (type-case D-MSE var
-              [i-id (v) (type-case MSE-Value (lookup v env)
-                          [seqV (l) (length l)]
-                          [else (error "need a seqnV or a num")])]
-              [i-num (n) n]
-              [else (error "Insertion index must be a number!")]))
-
-          ;REMOVE
-          #;(define (tolist seq)
-            (type-case D-MSE seq
-              [i-sequence (l) l]
-              ;#;TODO[i-seqn (l) (map (lambda (sym) (i-note (i-num (interp sym))
-              ;         (i-num 10)  (i-num 10))) l)]
-              ;[i-id (name) (tolist (lookup name env) env)
-              [else (error "need a sequence")]))
           
-          (define (tolist2 seq)
+          (define (tolist seq)
             (type-case MSE-Value seq
               [seqV (l) l]
               [else (error "need a seqnV")]))
@@ -344,18 +326,18 @@
                              [define arg-val (helper arg-expr env)])
                        (helper (closureV-body fun-val)
                                (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
-              [i-interleave (l1 l2) (seqV (inter (tolist2 (helper l1 env)) (tolist2 (helper l2 env))))]
-              [i-insert (l1 l2 index) (seqV (doInsert (tolist2  (helper l1 env) ) (tolist2  (helper l2 env)) (helper index env)))]
-              [i-transpose (listN value)  (seqV (map (lambda (m) (transOne value m env)) (tolist2 (helper listN env)))) ]
-              [changeProp (prop listN value) (cond [(eq? prop 'p) (seqV (map (lambda (m) (changePit value m env)) (tolist2 (helper listN env))))]
-                                                   [(eq? prop 'v) (seqV (map (lambda (m) (changeVol value m env)) (tolist2 (helper listN env))))]
-                                                   [(eq? prop 'd) (seqV (map (lambda (m) (changeDur value m env)) (tolist2 (helper listN env))))])]
+              [i-interleave (l1 l2) (seqV (inter (tolist (helper l1 env)) (tolist (helper l2 env))))]
+              [i-insert (l1 l2 index) (seqV (doInsert (tolist  (helper l1 env) ) (tolist  (helper l2 env)) (helper index env)))]
+              [i-transpose (listN value)  (seqV (map (lambda (m) (transOne value m env)) (tolist (helper listN env)))) ]
+              [changeProp (prop listN value) (cond [(eq? prop 'p) (seqV (map (lambda (m) (changePit value m env)) (tolist (helper listN env))))]
+                                                   [(eq? prop 'v) (seqV (map (lambda (m) (changeVol value m env)) (tolist (helper listN env))))]
+                                                   [(eq? prop 'd) (seqV (map (lambda (m) (changeDur value m env)) (tolist (helper listN env))))])]
               [i-zip (pL vL dL) (seqV (map (lambda (p v d) (noteV (noteV-pit p)
                                                                   (noteV-vel v)
                                                                   (noteV-dur d)))
-                                           (tolist2 (helper pL env))
-                                           (tolist2 (helper vL env))
-                                           (tolist2 (helper dL env))))] ;;TODO list size checking for map, all must be the same length
+                                           (tolist (helper pL env))
+                                           (tolist (helper vL env))
+                                           (tolist (helper dL env))))] ;;TODO list size checking for map, all must be the same length
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
 
