@@ -35,9 +35,10 @@
 ;;     | {insert <MSE> in <MSE> at <num>}           ; Inserts MSE in MSE at index number
 ;;     | {transpose <MSE> <num>}                    ; Takes a sequence of notes and a number, and
 ;;                                                    adds that number to the pitch of all notes in the sequence
-;;     | {changePits <MSE> <num>}                    ; change pitches of all notes in the sequence to the given number
-;;     | {changeVels <MSE> <num>}                    ; change velocities of all notes in the sequence to the given number
-;;     | {changeDurs <MSE> <num>}                    ; change durations of all notes in the sequence to the given number
+;;     | {changePits <MSE> <num>}                   ; change pitches of all notes in the sequence to the given number
+;;     | {changeVels <MSE> <num>}                   ; change velocities of all notes in the sequence to the given number
+;;     | {changeDurs <MSE> <num>}                   ; change durations of all notes in the sequence to the given number
+;;     | {zip <MSE> <MSE> <MSE>}                    ; creates a new sequence using the pitches of the 1st, velocity of the 2nd, and duration of the 3rd lists in order of occurance
 ;;     | {markov <MSE> <num> <MSE>?}                ; Runs markov chain (with a depth of 1) as shown in the example above
 
 ; Note Message is 3 bytes
@@ -105,7 +106,7 @@
 ;; Environments store values, instead of substitutions
 (define-type Env
   [mtEnv]
-  [anEnv (name symbol?) (value MSE-Value?) (env Env?)])
+  [anEnv (name symbol?) (value (or/c number? MSE-Value?)) (env Env?)])
 
 ;; ID's which cannot be used by the user.
 ;TODO, update list to include all functions
@@ -312,13 +313,13 @@
               [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
               ;prop selects the field to bind the values into
               [i-seqn (prop syms) (cond [(eq? prop 'p) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
-                                                                                       (velV  10)
-                                                                                       (durV  10))) syms))]
-                                        [(eq? prop 'v) (seqV (map (lambda (sym) (noteV (pitchV 0)
+                                                                                       (velV  (helper (i-id 'DVEL) env))
+                                                                                       (durV  (helper (i-id 'DDUR) env)))) syms))]
+                                        [(eq? prop 'v) (seqV (map (lambda (sym) (noteV (pitchV (helper (i-id 'DPIT) env))
                                                                                        (velV  (helper sym env))
-                                                                                       (durV  10))) syms))]
-                                        [(eq? prop 'd) (seqV (map (lambda (sym) (noteV (pitchV 0)
-                                                                                       (velV  10)
+                                                                                       (durV  (helper (i-id 'DDUR) env)))) syms))]
+                                        [(eq? prop 'd) (seqV (map (lambda (sym) (noteV (pitchV (helper (i-id 'DPIT) env))
+                                                                                       (velV  (helper (i-id 'DVEL) env))
                                                                                        (durV  (helper sym env)))) syms))])]
               [i-fun (arg-name body) (closureV arg-name body env)]
               [i-app (fun-expr arg-expr)
@@ -339,7 +340,8 @@
                                            (tolist (helper vL env))
                                            (tolist (helper dL env))))] ;;TODO list size checking for map, all must be the same length
               [else "NO!!!"]))]
-    (helper d-mse (mtEnv))))
+    ;Trampoline into interp, set the defualt Pitch, Velocity and Duration to O unless overridden
+    (helper d-mse (anEnv 'DPIT 0 (anEnv 'DVEL 0 (anEnv 'DDUR 0 (mtEnv)))))))
 
 
 ;;Run MSE -> MSE-Value
