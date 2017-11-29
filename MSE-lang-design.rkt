@@ -24,6 +24,8 @@
 ;;     | {note <num> <num> <num>}
 ;;     | {sequence <MSE>*}
 ;;     | {seqn-p <MSE>*}                            ; A list of given notes in letter format (e.g. A4 E5)
+;;     | {seqn-v <MSE>*}
+;;     | {seqn-d <MSE>*}  
 ;;     | {seq-append <MSE> to <MSE>}                ; Appends the 2nd MSE Expression to
 ;;                                                    the end of the first
 ;;     | {with {<id> <MSE>} <MSE>}     
@@ -51,6 +53,8 @@
   [note (pitch num?) (vel num?) (dur num?)] ; Pitch, Velocity, Duration
   [sequence (values (listof note?))]                  ; Distributions must not be empty and strictly evaluate to a (listof Note)
   [seqn-p (values (listof MSE?))]
+  [seqn-v (values (listof MSE?))]
+  [seqn-d (values (listof MSE?))]
   [seq-append (list1 MSE?) (list2 MSE?)]              
   [with (id symbol?) (expr MSE?) (body MSE?)]
   [fun (param symbol?) (body MSE?)]
@@ -58,7 +62,9 @@
   [interleave (list1 MSE?) (list2 MSE?)]
   [insert (list1 MSE?) (list2 MSE?) (index num?)]
   [transpose (list1 MSE?) (add-val num?)]
-  [changeVelocity (list1 MSE?) (val num?)]
+  [changePits (list1 MSE?) (val num?)]
+  [changeVels (list1 MSE?) (val num?)]
+  [changeDurs (list1 MSE?) (val num?)]
   [markov (seed MSE?) (length num?) (initial-note MSE?)] ; initial-note has to evaluate to a note
   )
 
@@ -69,13 +75,13 @@
   [i-id (name symbol?)]
   [i-note (pitch D-MSE?) (vel D-MSE?) (dur D-MSE?)]
   [i-sequence (values (listof i-note?))]
-  [i-seqn-p (values (listof D-MSE?))]
+  [i-seqn (prop symbol?) (values (listof D-MSE?))] ;prop field selects between pitch, vel, and dur targets
   [i-fun (param symbol?) (body D-MSE?)]
   [i-app (function D-MSE?) (arg D-MSE?)]
   [i-interleave (list1 D-MSE?) (list2 D-MSE?)]
   [i-insert (list1 D-MSE?)(list2 D-MSE?)(index D-MSE?)]
   [i-transpose (list1 D-MSE?)(add-val i-num?)]
-  [changeProp (list1 D-MSE?) (val i-num?) (pos i-num?)]
+  [changeProp (prop symbol?) (list1 D-MSE?) (val i-num?)]
   [i-markov (seed D-MSE?)(length i-num?)(initial-note D-MSE?)]
   )
 
@@ -101,13 +107,17 @@
 (define *reserved-symbols* '(note
                              sequence
                              seqn-p
+                             seqn-v
+                             seqn-d
                              seq-append
                              with
                              fun
                              interleave
                              insert
                              transpose
-                             changeVelocity
+                             changePits
+                             changeVels
+                             changeDurs                           
                              markov)) ; defining what the reserved symbols of the system are
 
 
@@ -124,118 +134,126 @@
               [else true])
             (not (member sym *reserved-symbols*)))))
 
-  ;;parse s-exp -> MSE
-  ;;Parses s-exp input and does valid-id checking for binding sites
-  (define (parse sexp)
-    (match sexp
-      [(? number?) (num sexp)]
-      [(? symbol?) (id sexp)]
-      [(list 'note pitch vel dur) (note (parse pitch) (parse vel) (parse dur))]
-      [(cons 'sequence notes) (sequence (map parse notes))]
-      [(cons 'seqn-p notes) (seqn-p  (map parse notes))]
-      [(list 'seq-append list1 list2) (seq-append (parse list1) (parse list2))]
-      [(list 'with (list (? valid-id? id) value) body) (with id (parse value) (parse body))]
-      [(list 'fun (? valid-id? param) body) (fun param (parse body))]
-      ;TODO Explicitly cause invalid-id error for fun and with?
-      [(list (and f-expr (? (lambda (s) (not (member s *reserved-symbols*))))) a-expr)
-       (app (parse f-expr) (parse a-expr))]
-      [(list 'interleave list1 list2) (interleave (parse list1) (parse list2))]
-      [(list 'insert list1 list2 index) (insert (parse list1) (parse list2) (parse index))]
-      [(list 'transpose list1 add-val) (transpose (parse list1) (parse add-val))]
-      [(list 'changeVelocity list1 val) (changeVelocity (parse list1) (parse val))]
-      [(list 'markov seed length initial-note) (markov (parse seed) (parse length) (parse initial-note))]
-      [else (error "Illegal Expression")]))
+;;parse s-exp -> MSE
+;;Parses s-exp input and does valid-id checking for binding sites
+(define (parse sexp)
+  (match sexp
+    [(? number?) (num sexp)]
+    [(? symbol?) (id sexp)]
+    [(list 'note pitch vel dur) (note (parse pitch) (parse vel) (parse dur))]
+    [(cons 'sequence notes) (sequence (map parse notes))]
+    [(cons 'seqn-p pitches) (seqn-p  (map parse pitches))]
+    [(cons 'seqn-v vels) (seqn-v  (map parse vels))]
+    [(cons 'seqn-d durs) (seqn-d  (map parse durs))]
+    [(list 'seq-append list1 list2) (seq-append (parse list1) (parse list2))]
+    [(list 'with (list (? valid-id? id) value) body) (with id (parse value) (parse body))]
+    [(list 'fun (? valid-id? param) body) (fun param (parse body))]
+    ;TODO Explicitly cause invalid-id error for fun and with?
+    [(list (and f-expr (? (lambda (s) (not (member s *reserved-symbols*))))) a-expr)
+     (app (parse f-expr) (parse a-expr))]
+    [(list 'interleave list1 list2) (interleave (parse list1) (parse list2))]
+    [(list 'insert list1 list2 index) (insert (parse list1) (parse list2) (parse index))]
+    [(list 'transpose list1 add-val) (transpose (parse list1) (parse add-val))]
+    [(list 'changePits list1 val) (changePits (parse list1) (parse val))]
+    [(list 'changeVels list1 val) (changeVels (parse list1) (parse val))]
+    [(list 'changeDurs list1 val) (changeDurs (parse list1) (parse val))]
+    [(list 'markov seed length initial-note) (markov (parse seed) (parse length) (parse initial-note))]
+    [else (error "Illegal Expression")]))
 
 
 
 
 
-  ;;;;;;;;;;;;;;;;   DESUGARER   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;   DESUGARER   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-  ;;desugar MSE -> D-MSE
-  (define (desugar p-mse)
-    (type-case MSE p-mse
-      [num (n) (i-num n)]
-      [id (val) (i-id val)]
-      [note (p v d) (i-note (desugar p)
-                            (desugar v)
-                            (desugar d))]
-      [sequence (vals) (i-sequence (map desugar vals))]
-      [seqn-p (vals) (i-seqn-p (map desugar vals))]
-      ;TODO seq-append support for IDs
-      [seq-append (seq1 seq2)
-                  (i-insert (desugar seq1)
-                            (desugar seq2)
-                            (type-case MSE seq1
-                                             [sequence (s) (i-num (length (i-sequence-values (desugar seq1))))]
-                                             [seqn-p (s) (i-num (length (i-seqn-p-values (desugar seq1))))]
-                                             [id (var) (desugar seq1)]
-                                             [else (error "need a sequence or seqn-p")]))] 
-      [with (id named-expr body) (desugar (app (fun id body) named-expr))]
-      [fun (param body) (i-fun param (desugar body))]
-      [app (fn-exp arg-exp) (i-app (desugar fn-exp)
-                                   (desugar arg-exp))]
-      [interleave (lst1 lst2)
-                  (i-interleave (desugar lst1)(desugar lst2))]
-      [insert (lst1 lst2 index)
-              (i-insert (desugar lst1)(desugar lst2)(desugar index))]
-      [transpose (lst1 anum )
-                 (i-transpose (desugar lst1)(desugar anum))]
-      [changeVelocity (list1 val) (changeProp (desugar list1) (desugar val) (i-num 2))]
-      [markov (s lth ini)
-              (i-markov (desugar s)(desugar lth)(desugar ini))]
-      ))
+;;desugar MSE -> D-MSE
+(define (desugar p-mse)
+  (type-case MSE p-mse
+    [num (n) (i-num n)]
+    [id (val) (i-id val)]
+    [note (p v d) (i-note (desugar p)
+                          (desugar v)
+                          (desugar d))]
+    [sequence (vals) (i-sequence (map desugar vals))]
+    [seqn-p (vals) (i-seqn 'p (map desugar vals))]
+    [seqn-v (vals) (i-seqn 'v (map desugar vals))]
+    [seqn-d (vals) (i-seqn 'd (map desugar vals))]
+    ;TODO seq-append support for IDs
+    [seq-append (seq1 seq2)
+                (i-insert (desugar seq1)
+                          (desugar seq2)
+                          (type-case MSE seq1
+                            [sequence (s) (i-num (length (i-sequence-values (desugar seq1))))]
+                            [seqn-p (s) (i-num (length (i-seqn-values (desugar seq1))))]
+                            [id (var) (desugar seq1)]
+                            [else (error "need a sequence or seqn-p")]))] 
+    [with (id named-expr body) (desugar (app (fun id body) named-expr))]
+    [fun (param body) (i-fun param (desugar body))]
+    [app (fn-exp arg-exp) (i-app (desugar fn-exp)
+                                 (desugar arg-exp))]
+    [interleave (lst1 lst2)
+                (i-interleave (desugar lst1)(desugar lst2))]
+    [insert (lst1 lst2 index)
+            (i-insert (desugar lst1)(desugar lst2)(desugar index))]
+    [transpose (lst1 anum )
+               (i-transpose (desugar lst1)(desugar anum))]
+    [changePits (list1 val) (changeProp 'p (desugar list1) (desugar val))]
+    [changeVels (list1 val) (changeProp 'v (desugar list1) (desugar val))]
+    [changeDurs (list1 val) (changeProp 'd (desugar list1) (desugar val))]
+    [markov (s lth ini)
+            (i-markov (desugar s)(desugar lth)(desugar ini))]
+    ))
 
 
-  ;;;;;;;;;;;;;;;;   INTERPRETER   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;   INTERPRETER   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-  ;;decode-pitch symbol -> number
-  ;;name must be castable and pass regex to get here
-  (define (decode-pitch sym)
-    (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
-              ['("C") 0]
-              ['("D") 2]
-              ['("E") 4]
-              ['("F") 5]
-              ['("G") 7]
-              ['("A") 9]
-              ['("B") 11])
-            (match (regexp-match #rx"b|#" (symbol->string sym))
-              ;;TODO, cound number of b or # and multiply by +-1
-              ['("b") -1]
-              ['("#") 1]
-              [else 0])
-            (* (string->number (first (regexp-match #rx"[0-9]+" (symbol->string sym)))) 12)))
+;;decode-pitch symbol -> number
+;;name must be castable and pass regex to get here
+(define (decode-pitch sym)
+  (+ (match (regexp-match #rx"[A-G]" (symbol->string sym))
+       ['("C") 0]
+       ['("D") 2]
+       ['("E") 4]
+       ['("F") 5]
+       ['("G") 7]
+       ['("A") 9]
+       ['("B") 11])
+     (match (regexp-match #rx"b|#" (symbol->string sym))
+       ;;TODO, cound number of b or # and multiply by +-1
+       ['("b") -1]
+       ['("#") 1]
+       [else 0])
+     (* (string->number (first (regexp-match #rx"[0-9]+" (symbol->string sym)))) 12)))
          
 
-  ;;lookup symbol -> MSE
-  (define (lookup name env)
-    (local ([define (lookup-helper name env)
-              (type-case Env env
-                [mtEnv () (error 'lookup "free identifier ~a" name)]
-                [anEnv (bound-name bound-value rest-env)
-                       (if (symbol=? bound-name name)
-                           bound-value
-                           (lookup-helper name rest-env))])]
-            [define (pitch-check name)
-              (match (symbol->string name)
-                [(regexp #rx"[A-G](#|b)*[0-9]+$") true]
-                [else false])])
-      (if (pitch-check name)
-          (decode-pitch name) ;;name must be castable and pass regex to get here
-          (lookup-helper name env))))
+;;lookup symbol -> MSE
+(define (lookup name env)
+  (local ([define (lookup-helper name env)
+            (type-case Env env
+              [mtEnv () (error 'lookup "free identifier ~a" name)]
+              [anEnv (bound-name bound-value rest-env)
+                     (if (symbol=? bound-name name)
+                         bound-value
+                         (lookup-helper name rest-env))])]
+          [define (pitch-check name)
+            (match (symbol->string name)
+              [(regexp #rx"[A-G](#|b)*[0-9]+$") true]
+              [else false])])
+    (if (pitch-check name)
+        (decode-pitch name) ;;name must be castable and pass regex to get here
+        (lookup-helper name env))))
 
 
-  ;;interp D-MSE -> MSE-Value
-  (define (interp d-mse)
+;;interp D-MSE -> MSE-Value
+(define (interp d-mse)
   (local [(define (transOne val m env)
             (type-case MSE-Value m
               [noteV (p v d)  (noteV (pitchV (+ (helper val env) (type-case MSE-Value p
-                                                           [pitchV (n) n]
-                                                           [else (error "need a pitch")]))) v d)]
+                                                                   [pitchV (n) n]
+                                                                   [else (error "need a pitch")]))) v d)]
               [else (transOne val
                               (type-case MSE-Value (helper m env)
                                 [noteV (p v d) (noteV p v d)]
@@ -276,8 +294,8 @@
           (define (tolist seq)
             (type-case D-MSE seq
               [i-sequence (l) l]
-              [i-seqn-p (l) (map (lambda (sym) (i-note (i-num (interp sym))
-                                                       (i-num 10)  (i-num 10))) l)]
+              ;#;TODO[i-seqn (l) (map (lambda (sym) (i-note (i-num (interp sym))
+              ;         (i-num 10)  (i-num 10))) l)]
               ;[i-id (name) (tolist (lookup name env) env)
               [else (error "need a sequence")]))
           (define (tolist2 seq)
@@ -299,9 +317,16 @@
                                      (durV (helper d env)))]
               [i-id  (name)  (lookup name env)]
               [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
-              [i-seqn-p (syms) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
-                                                               (velV  10)
-                                                               (durV  10))) syms))]
+              ;prop selects the field to bind the values into
+              [i-seqn (prop syms) (cond [(eq? prop 'p) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
+                                                                                       (velV  10)
+                                                                                       (durV  10))) syms))]
+                                        [(eq? prop 'v) (seqV (map (lambda (sym) (noteV (pitchV 0)
+                                                                                       (velV  (helper sym env))
+                                                                                       (durV  10))) syms))]
+                                        [(eq? prop 'd) (seqV (map (lambda (sym) (noteV (pitchV 0)
+                                                                                       (velV  10)
+                                                                                       (durV  (helper sym env)))) syms))])]
               [i-fun (arg-name body) (closureV arg-name body env)]
               [i-app (fun-expr arg-expr)
                      (local ([define fun-val (helper fun-expr env)]
@@ -311,17 +336,17 @@
               [i-interleave (l1 l2) (seqV (inter (tolist2 (helper l1 env)) (tolist2 (helper l2 env))))]
               [i-insert (l1 l2 index) (seqV (doInsert (tolist2  (helper l1 env) ) (tolist2  (helper l2 env)) (readIndex index env)))]
               [i-transpose (listN value)  (seqV (map (lambda (m) (transOne value m env)) (tolist2 (helper listN env)))) ]
-              [changeProp (listN value pos) (cond [(= 1 (helper pos env)) (seqV (map (lambda (m) (changePit value m env)) (tolist2 (helper listN env))))]
-                                                  [(= 2 (helper pos env)) (seqV  (map (lambda (m) (changeVol value m env)) (tolist2 (helper listN env))))]
-                                                  [(= 3 (helper pos env)) (seqV (map (lambda (m) (transOne value m env)) (tolist2 (helper listN env))))])]
+              [changeProp (prop listN value) (cond [(eq? prop 'p) (seqV (map (lambda (m) (changePit value m env)) (tolist2 (helper listN env))))]
+                                                   [(eq? prop 'v) (seqV  (map (lambda (m) (changeVol value m env)) (tolist2 (helper listN env))))]
+                                                   [(eq? prop 'd) (seqV (map (lambda (m) (transOne value m env)) (tolist2 (helper listN env))))])]
               [else "NO!!!"]))]
     (helper d-mse (mtEnv))))
 
 
-  ;;Run MSE -> MSE-Value
-  ;;Interprets the result of desugaring the parse s-expression
-  (define (run mse)
-    (interp (desugar (parse mse))))
+;;Run MSE -> MSE-Value
+;;Interprets the result of desugaring the parse s-expression
+(define (run mse)
+  (interp (desugar (parse mse))))
 
 
   

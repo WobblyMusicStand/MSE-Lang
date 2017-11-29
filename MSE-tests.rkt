@@ -31,13 +31,17 @@
 (test/exn (parse '{with {note 1} 1}) "")
 (test/exn (parse '{with {sequence 1} 1}) "")
 (test/exn (parse '{with {seqn-p 1} 1}) "")
+(test/exn (parse '{with {seqn-v 1} 1}) "")
+(test/exn (parse '{with {seqn-d 1} 1}) "")
 (test/exn (parse '{with {seq-append 1} 1}) "")
 (test/exn (parse '{with {with 1} 1}) "")
 (test/exn (parse '{with {fun 1} 1}) "")
 (test/exn (parse '{with {interleave 1} 1}) "")
 (test/exn (parse '{with {insert 1} 1}) "")
 (test/exn (parse '{with {transpose 1} 1}) "")
-(test/exn (parse '{with {changeVelocity 1} 1}) "")
+(test/exn (parse '{with {changePits 1} 1}) "")
+(test/exn (parse '{with {changeVels 1} 1}) "")
+(test/exn (parse '{with {changeDurs 1} 1}) "")
 (test/exn (parse '{with {markov 1} 1}) "")
 ;pitches
 (test/exn (parse '{with {A4 1} 1}) "")
@@ -64,6 +68,7 @@
 (test (desugar (parse '{with {c {seqn-p C4 C5 C6}}
                              {seq-append c c}}))
       "")
+;;wtf is this solution, just remove desugaring for inserts. fml
 
 
 ;; sequence
@@ -73,36 +78,44 @@
                                  {note 50 60 70}}))
       (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60))
                         (i-note (i-num 50) (i-num 60) (i-num 70)))))
-;; seqn-p
+
+;; seqn-x s
+(test (desugar (parse '(seqn-p A4 A5 A6)))
+      (i-seqn 'p (list (i-id 'A4) (i-id 'A5) (i-id 'A6))))
+(test (desugar (parse '(seqn-v 60 62 73)))
+      (i-seqn 'v (list (i-num 60) (i-num 62) (i-num 73))))
+(test (desugar (parse '(seqn-d 1000 0 100000)))
+      (i-seqn 'd (list (i-num 1000) (i-num 0) (i-num 100000))))
+
 ;; happy birthday
 (test (desugar (parse '(seqn-p A4 A4 B4 A4 D5 C#5 A4 A4 B4 A4 E5 D5 A4 A4 A5 F#5 D5 C#5 B4 G5 G5 F#5 D5 E5 D5 )))
-      (i-seqn-p
-       (list
-        (i-id 'A4)
-        (i-id 'A4)
-        (i-id 'B4)
-        (i-id 'A4)
-        (i-id 'D5)
-        (i-id 'C#5)
-        (i-id 'A4)
-        (i-id 'A4)
-        (i-id 'B4)
-        (i-id 'A4)
-        (i-id 'E5)
-        (i-id 'D5)
-        (i-id 'A4)
-        (i-id 'A4)
-        (i-id 'A5)
-        (i-id 'F#5)
-        (i-id 'D5)
-        (i-id 'C#5)
-        (i-id 'B4)
-        (i-id 'G5)
-        (i-id 'G5)
-        (i-id 'F#5)
-        (i-id 'D5)
-        (i-id 'E5)
-        (i-id 'D5))))
+      (i-seqn 'p
+              (list
+               (i-id 'A4)
+               (i-id 'A4)
+               (i-id 'B4)
+               (i-id 'A4)
+               (i-id 'D5)
+               (i-id 'C#5)
+               (i-id 'A4)
+               (i-id 'A4)
+               (i-id 'B4)
+               (i-id 'A4)
+               (i-id 'E5)
+               (i-id 'D5)
+               (i-id 'A4)
+               (i-id 'A4)
+               (i-id 'A5)
+               (i-id 'F#5)
+               (i-id 'D5)
+               (i-id 'C#5)
+               (i-id 'B4)
+               (i-id 'G5)
+               (i-id 'G5)
+               (i-id 'F#5)
+               (i-id 'D5)
+               (i-id 'E5)
+               (i-id 'D5))))
 
 ;; seq-append
 (test (desugar (parse '{seq-append
@@ -114,8 +127,8 @@
        (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60))))
        (i-num 2)))
 (test (desugar (parse '{seq-append {seqn-p C4 C4} {seqn-p G4 G4 A4 A4 G4}}))
-      (i-insert (i-seqn-p (list (i-id 'C4) (i-id 'C4)))
-                (i-seqn-p (list (i-id 'G4) (i-id 'G4) (i-id 'A4) (i-id 'A4) (i-id 'G4)))
+      (i-insert (i-seqn 'p (list (i-id 'C4) (i-id 'C4)))
+                (i-seqn 'p (list (i-id 'G4) (i-id 'G4) (i-id 'A4) (i-id 'A4) (i-id 'G4)))
                 (i-num 2)))
 
 ;; with
@@ -129,7 +142,7 @@
       (i-interleave (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50))))
                     (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60))))))
 (test (desugar (parse '{interleave {seqn-p A4}{seqn-p A4}}))
-      (i-interleave (i-seqn-p (list (i-id 'A4))) (i-seqn-p (list (i-id 'A4)))))
+      (i-interleave (i-seqn 'p (list (i-id 'A4))) (i-seqn 'p (list (i-id 'A4)))))
 ;; insert
 (test (desugar (parse '{insert {sequence {note 20 30 40}}
                                {sequence {note 30 40 50}
@@ -143,19 +156,19 @@
                          (i-note (i-num 10) (i-num 20) (i-num 30))))
        (i-num 2)))
 (test (desugar (parse '{insert {seqn-p A4 A4} {seqn-p B4 B4} 1}))
-      (i-insert (i-seqn-p (list (i-id 'A4) (i-id 'A4)))
-                (i-seqn-p (list (i-id 'B4) (i-id 'B4)))
+      (i-insert (i-seqn 'p (list (i-id 'A4) (i-id 'A4)))
+                (i-seqn 'p (list (i-id 'B4) (i-id 'B4)))
                 (i-num 1)))
 ;; transpose
 (test (desugar (parse '{transpose {sequence {note 30 40 50}} 14}))
       (i-transpose (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50)))) (i-num 14)))
 (test (desugar (parse '{transpose {seqn-p A4} 23}))
-      (i-transpose (i-seqn-p (list (i-id 'A4))) (i-num 23)))
+      (i-transpose (i-seqn 'p (list (i-id 'A4))) (i-num 23)))
 ;; changeVelocity
-(test (desugar (parse '{changeVelocity {sequence {note 10 20 30}} 40}))
-      (changeProp (i-sequence (list (i-note (i-num 10) (i-num 20) (i-num 30)))) (i-num 40) (i-num 2)))
-(test (desugar (parse '{changeVelocity {seqn-p C4 C4 G4 G4} 7}))
-      (changeProp (i-seqn-p (list (i-id 'C4) (i-id 'C4) (i-id 'G4) (i-id 'G4))) (i-num 7) (i-num 2)))
+(test (desugar (parse '{changeVels {sequence {note 10 20 30}} 40}))
+      (changeProp 'v (i-sequence (list (i-note (i-num 10) (i-num 20) (i-num 30)))) (i-num 40)))
+(test (desugar (parse '{changeVels {seqn-p C4 C4 G4 G4} 7}))
+      (changeProp 'v (i-seqn 'p (list (i-id 'C4) (i-id 'C4) (i-id 'G4) (i-id 'G4))) (i-num 7)))
 ;; markov
 (test  (desugar (parse '{markov
                          {sequence {note 20 30 40}
@@ -170,9 +183,9 @@
         (i-num 20)
         (i-sequence (list (i-note (i-num 20) (i-num 30) (i-num 40))))))
 (test (desugar (parse '{markov {seqn-p C4 D4 E4 F4 G4 A4 B4} 10 {seqn-p E4}}))
-      (i-markov (i-seqn-p (list (i-id 'C4) (i-id 'D4) (i-id 'E4) (i-id 'F4) (i-id 'G4) (i-id 'A4) (i-id 'B4)))
+      (i-markov (i-seqn 'p (list (i-id 'C4) (i-id 'D4) (i-id 'E4) (i-id 'F4) (i-id 'G4) (i-id 'A4) (i-id 'B4)))
                 (i-num 10)
-                (i-seqn-p (list (i-id 'E4)))))
+                (i-seqn 'p (list (i-id 'E4)))))
 
 
 
@@ -197,10 +210,10 @@
 (test (run 'C0) 0)
 (test (run 'C10) 120)
 
-(test (run 'Cbb4) 46)
-(test (run 'C##4) 50)
-(test (run 'Cb#4) 48)
-(test (run 'C#b4) 48)
+;(test (run 'Cbb4) 46)
+;(test (run 'C##4) 50)
+;(test (run 'Cb#4) 48)
+;(test (run 'C#b4) 48)
 
 (test/exn (run 'B-1) "") ;out of range
 (test/exn (run 'C) "")   ;no octave
@@ -208,6 +221,24 @@
 (test/exn (run 'h) "")   ;no
 (test (run '0) 0)        ;duh
 
+
+
+;; seqn-x s
+(test (run '(seqn-p C4 C5 C6))
+      (seqV (list
+             (noteV (pitchV 48) (velV 10) (durV 10))
+             (noteV (pitchV 60) (velV 10) (durV 10))
+             (noteV (pitchV 72) (velV 10) (durV 10)))))
+(test (run '(seqn-v 60 62 73))
+      (seqV (list
+             (noteV (pitchV 0) (velV 60) (durV 10))
+             (noteV (pitchV 0) (velV 62) (durV 10))
+             (noteV (pitchV 0) (velV 73) (durV 10)))))
+(test (run '(seqn-d 1000 0 100000))
+      (seqV (list
+             (noteV (pitchV 0) (velV 10) (durV 1000))
+             (noteV (pitchV 0) (velV 10) (durV 0))
+             (noteV (pitchV 0) (velV 10) (durV 100000)))))
 
 
 
