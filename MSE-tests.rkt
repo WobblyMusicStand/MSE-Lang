@@ -66,8 +66,8 @@
 ;TODO, append cannot be desugared to support ids?
 ;or, not desugared when first arg is ID?
 #;(test (desugar (parse '{with {c {seqn-p C4 C5 C6}}
-                             {seq-append c c}}))
-      "")
+                               {seq-append c c}}))
+        "")
 ;;wtf is this solution, just remove desugaring for inserts. fml
 
 
@@ -125,11 +125,11 @@
       (i-insert
        (i-sequence (list (i-note (i-num 30) (i-num 40) (i-num 50)) (i-note (i-num 20) (i-num 30) (i-num 40))))
        (i-sequence (list (i-note (i-num 40) (i-num 50) (i-num 60))))
-       (i-num 2)))
+       (i-num -1)))
 (test (desugar (parse '{seq-append {seqn-p C4 C4} {seqn-p G4 G4 A4 A4 G4}}))
       (i-insert (i-seqn 'p (list (i-id 'C4) (i-id 'C4)))
                 (i-seqn 'p (list (i-id 'G4) (i-id 'G4) (i-id 'A4) (i-id 'A4) (i-id 'G4)))
-                (i-num 2)))
+                (i-num -1)))
 
 ;; with
 (test (desugar (parse '{with {c
@@ -234,6 +234,17 @@
 (test (run '0) 0)        ;duh
 
 
+;;Notes
+(test (run '{note 1 2 3})
+      (noteV (pitchV 1) (velV 2) (durV 3)))
+
+(test (run '{note A1 2 3}) ;note must expect MSE
+      (noteV (pitchV 21) (velV 2) (durV 3)))
+
+
+
+(test/exn (run '{note {note 1 2 3} A1 3})
+          "") ;pitchV expects numbers
 
 ;; seqn-xs
 (test (run '(seqn-p C4 C5 C6))
@@ -267,6 +278,8 @@
                   c})
       (seqV (list (noteV (pitchV 10) (velV 20) (durV 30)))))
 
+
+;;interleave
 (test (run '{interleave {sequence {note 10 20 30} {note 20 20 20}} {sequence {note 30 20 10} {note 30 30 30}}})
       (seqV
        (list
@@ -280,6 +293,7 @@
                   (noteV (pitchV 30) (velV 20) (durV 10))
                   (noteV (pitchV 30) (velV 30) (durV 30)))))
 
+;;append
 (test (run '(seq-append (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
       (seqV
        (list
@@ -287,5 +301,35 @@
         (noteV (pitchV 20) (velV 20) (durV 20))
         (noteV (pitchV 30) (velV 20) (durV 10))
         (noteV (pitchV 30) (velV 30) (durV 30)))))
+
+;;insert
+(test (run '{insert {seqn-p C4 C4} {seqn-p C5 C5} 0})
+      (seqV
+       (list
+        (noteV (pitchV 48) (velV 10) (durV 10))
+        (noteV (pitchV 48) (velV 10) (durV 10))
+        (noteV (pitchV 60) (velV 10) (durV 10))
+        (noteV (pitchV 60) (velV 10) (durV 10)))))
+
+(test (run '{insert {seqn-p C4 C4} into {seqn-p C5 C5} at 1})
+      (seqV
+       (list
+        (noteV (pitchV 60) (velV 10) (durV 10))
+        (noteV (pitchV 48) (velV 10) (durV 10))
+        (noteV (pitchV 48) (velV 10) (durV 10))
+        (noteV (pitchV 60) (velV 10) (durV 10)))))
+
+(test (run '{insert {seqn-p C4 C4} {seqn-p C5 C5} 2})
+      (seqV
+       (list
+        (noteV (pitchV 60) (velV 10) (durV 10))
+        (noteV (pitchV 60) (velV 10) (durV 10))
+        (noteV (pitchV 48) (velV 10) (durV 10))
+        (noteV (pitchV 48) (velV 10) (durV 10)))))
+
+(test/exn (run '{with {i 2} {insert {seqn-p C4 C4} {seqn-p C5 C5} i}})
+      "") ;indexes must be provided as numbers, not variables
+
+
 
 

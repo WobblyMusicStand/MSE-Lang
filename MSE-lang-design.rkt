@@ -21,7 +21,7 @@
 ;;
 ;; <MSE> ::= <num>
 ;;     | <id>
-;;     | {note <num> <num> <num>}
+;;     | {note <MSE> <num> <num>}
 ;;     | {sequence <MSE>*}
 ;;     | {seqn-p <MSE>*}                            ; A list of given notes in letter format (e.g. A4 E5)
 ;;     | {seqn-v <MSE>*}
@@ -50,7 +50,7 @@
 (define-type MSE
   [num (n number?)]
   [id (name symbol?)]
-  [note (pitch num?) (vel num?) (dur num?)] ; Pitch, Velocity, Duration
+  [note (pitch num?) (vel num?) (dur num?)] ; Pitch, Velocity, Duration can be notes or IDs
   [sequence (values (listof note?))]                  ; Distributions must not be empty and strictly evaluate to a (listof Note)
   [seqn-p (values (listof MSE?))]
   [seqn-v (values (listof MSE?))]
@@ -152,8 +152,10 @@
     [(list (and f-expr (? (lambda (s) (not (member s *reserved-symbols*))))) a-expr)
      (app (parse f-expr) (parse a-expr))]
     [(list 'interleave list1 list2) (interleave (parse list1) (parse list2))]
-    [(list 'insert list1 list2 index) (insert (parse list1) (parse list2) (parse index))]
-    [(list 'transpose list1 add-val) (transpose (parse list1) (parse add-val))]
+    [(list 'interleave list1 into list2) (interleave (parse list1) (parse list2))] ;explicit version of interleave
+    [(list 'insert list1 list2 (? number? index)) (insert (parse list1) (parse list2) (parse index))]
+    [(list 'insert list1 into list2 at (? number? index)) (insert (parse list1) (parse list2) (parse index))] ;explicit version of insert
+    [(list 'transpose list1 (? number? add-val)) (transpose (parse list1) (parse add-val))]
     [(list 'changePits list1 val) (changePits (parse list1) (parse val))]
     [(list 'changeVels list1 val) (changeVels (parse list1) (parse val))]
     [(list 'changeDurs list1 val) (changeDurs (parse list1) (parse val))]
@@ -180,15 +182,10 @@
     [seqn-p (vals) (i-seqn 'p (map desugar vals))]
     [seqn-v (vals) (i-seqn 'v (map desugar vals))]
     [seqn-d (vals) (i-seqn 'd (map desugar vals))]
-    ;TODO seq-append support for IDs
-    [seq-append (seq1 seq2)
+    [seq-append (seq1 seq2) ;performs an insert with a negative index
                 (i-insert (desugar seq1)
                           (desugar seq2)
-                          (type-case MSE seq1
-                            [sequence (s) (i-num (length (i-sequence-values (desugar seq1))))]
-                            [seqn-p (s) (i-num (length (i-seqn-values (desugar seq1))))]
-                            [id (var) (desugar seq1)]
-                            [else (error "need a sequence or seqn-p")]))] 
+                          (i-num -1))]     
     [with (id named-expr body) (desugar (app (fun id body) named-expr))]
     [fun (param body) (i-fun param (desugar body))]
     [app (fn-exp arg-exp) (i-app (desugar fn-exp)
@@ -279,21 +276,24 @@
                                (type-case MSE-Value (helper m env)
                                  [noteV (p v d) (noteV p v d)]
                                  [else "need a note"]) env)]))
-          (define (doInsert lis1 lis2 n)
-            (cond [(> n (length lis1)) (append lis1 lis2)]
-                  [(= n 0)(append lis1 lis2)]
-                  [else
-                   (cons (first lis1) (doInsert (rest lis1)lis2 (sub1 n)))]))
           
-          (define (readIndex var env)
+          (define (doInsert lisS lisD n)
+            (cond [(> n (length lisD)) (append lisD lisS)] ;if desination length is smaller then desired index append source to the end of dest
+                  [(<= n 0)(append lisS lisD)] ;if index is <0, append destination to the end of source 
+                  [else
+                   (cons (first lisD) (doInsert lisS (rest lisD) (sub1 n)))])) ;else iterate over the elements in destination until index is reached
+
+          ;REMOVE
+          #;(define (readIndex var env)
             (type-case D-MSE var
               [i-id (v) (type-case MSE-Value (lookup v env)
                           [seqV (l) (length l)]
-                          [else (error "need a seqnV")])]
+                          [else (error "need a seqnV or a num")])]
               [i-num (n) n]
-              [else (error "need a num or an id")]))
-          
-          (define (tolist seq)
+              [else (error "Insertion index must be a number!")]))
+
+          ;REMOVE
+          #;(define (tolist seq)
             (type-case D-MSE seq
               [i-sequence (l) l]
               ;#;TODO[i-seqn (l) (map (lambda (sym) (i-note (i-num (interp sym))
@@ -305,6 +305,7 @@
             (type-case MSE-Value seq
               [seqV (l) l]
               [else (error "need a seqnV")]))
+          
           (define (inter lis1 lis2)
             (cond [(empty? lis1) lis2]
                   [(empty? lis2) lis1]
@@ -337,7 +338,7 @@
                        (helper (closureV-body fun-val)
                                (anEnv (closureV-param fun-val) arg-val (closureV-env fun-val))))]
               [i-interleave (l1 l2) (seqV (inter (tolist2 (helper l1 env)) (tolist2 (helper l2 env))))]
-              [i-insert (l1 l2 index) (seqV (doInsert (tolist2  (helper l1 env) ) (tolist2  (helper l2 env)) (readIndex index env)))]
+              [i-insert (l1 l2 index) (seqV (doInsert (tolist2  (helper l1 env) ) (tolist2  (helper l2 env)) (helper index env)))]
               [i-transpose (listN value)  (seqV (map (lambda (m) (transOne value m env)) (tolist2 (helper listN env)))) ]
               [changeProp (prop listN value) (cond [(eq? prop 'p) (seqV (map (lambda (m) (changePit value m env)) (tolist2 (helper listN env))))]
                                                    [(eq? prop 'v) (seqV (map (lambda (m) (changeVol value m env)) (tolist2 (helper listN env))))]
