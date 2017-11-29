@@ -54,8 +54,8 @@
 (define-type MSE
   [num (n number?)]
   [id (name symbol?)]
-  [note (pitch num?) (vel num?) (dur num?)] ; Pitch, Velocity, Duration can be notes or IDs
-  [sequence (values (listof note?))]                  ; Distributions must not be empty and strictly evaluate to a (listof Note)
+  [note (pitch MSE?) (vel MSE?) (dur MSE?)] ; Pitch, Velocity, Duration can be notes or IDs
+  [sequence (values (listof MSE?))]                  ; Distributions must not be empty and strictly evaluate to a (listof Note)
   [seqn-p (values (listof MSE?))]
   [seqn-v (values (listof MSE?))]
   [seqn-d (values (listof MSE?))]
@@ -79,7 +79,7 @@
   [i-num (n number?)]
   [i-id (name symbol?)]
   [i-note (pitch D-MSE?) (vel D-MSE?) (dur D-MSE?)]
-  [i-sequence (values (listof i-note?))]
+  [i-sequence (values (listof D-MSE?))]
   [i-seqn (prop symbol?) (values (listof D-MSE?))] ;prop field selects between pitch, vel, and dur targets
   [i-fun (param symbol?) (body D-MSE?)]
   [i-app (function D-MSE?) (arg D-MSE?)]
@@ -94,11 +94,11 @@
 ;; Interpreting a value returns a Value
 (define-type MSE-Value
   ; Sequence of  Notes
-  [pitchV (pit number?)]
+  [pitV (pit number?)]
   [velV (vel number?)]
   [durV (dur number?)]
-  [noteV (pit pitchV?) (vel velV?) (dur durV?)]
-  [seqV (values (and/c (listof MSE-Value?) (not/c empty?)))]  
+  [noteV (pit pitV?) (vel velV?) (dur durV?)]
+  [seqV (values (and/c (listof noteV?) (not/c empty?)))] ;no nested sequences
   [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
             (body D-MSE?)
             (env Env?)])
@@ -256,8 +256,8 @@
 (define (interp d-mse)
   (local [(define (transOne val m env)
             (type-case MSE-Value m
-              [noteV (p v d)  (noteV (pitchV (+ (helper val env) (type-case MSE-Value p
-                                                                   [pitchV (n) n]
+              [noteV (p v d)  (noteV (pitV (+ (helper val env) (type-case MSE-Value p
+                                                                   [pitV (n) n]
                                                                    [else (error "need a pitch")]))) v d)]
               [else (transOne val
                               (type-case MSE-Value (helper m env)
@@ -272,7 +272,7 @@
                                  [else "need a note"]) env)]))
           (define (changePit val m env)
             (type-case MSE-Value m
-              [noteV (p v d)  (noteV (pitchV (helper val env)) v d)]
+              [noteV (p v d)  (noteV (pitV (helper val env)) v d)]
               [else (changePit val
                                (type-case MSE-Value (helper m env)
                                  [noteV (p v d) (noteV p v d)]
@@ -294,7 +294,7 @@
           (define (tolist seq)
             (type-case MSE-Value seq
               [seqV (l) l]
-              [else (error "need a seqnV")]))
+              [else (error "need a seqV")]))
           
           (define (inter lis1 lis2)
             (cond [(empty? lis1) lis2]
@@ -306,19 +306,27 @@
           (define (helper expr env)
             (type-case D-MSE expr
               [i-num (n) n]
-              [i-note (p v d) (noteV (pitchV (helper p env))
-                                     (velV (helper v env) )
-                                     (durV (helper d env)))]
+              [i-note (p v d) (local [(define-values (pit) (helper p env))
+                                      (define-values (vel) (helper v env))
+                                      (define-values (dur) (helper d env))]
+                                (if (and (number? pit) (number? vel) (number? dur))
+                                    (noteV (pitV pit)
+                                           (velV vel)
+                                           (durV dur))
+                                    (error "note requires numeric pit, vel, dur; given:" pit vel dur)))]
               [i-id  (name)  (lookup name env)]
-              [i-sequence (vals) (seqV (map (lambda (exp) (helper exp env)) vals))]
+              [i-sequence (vals) (seqV (map (lambda (exp) (local [(define-values (pnote) (helper exp env))]
+                                                            (if (noteV? pnote)
+                                                                pnote
+                                                                (error "sequence requires noteV, given:" pnote)))) vals))]
               ;prop selects the field to bind the values into
-              [i-seqn (prop syms) (cond [(eq? prop 'p) (seqV (map (lambda (sym) (noteV (pitchV (helper sym env))
+              [i-seqn (prop syms) (cond [(eq? prop 'p) (seqV (map (lambda (sym) (noteV (pitV (helper sym env))
                                                                                        (velV  (helper (i-id 'DVEL) env))
                                                                                        (durV  (helper (i-id 'DDUR) env)))) syms))]
-                                        [(eq? prop 'v) (seqV (map (lambda (sym) (noteV (pitchV (helper (i-id 'DPIT) env))
+                                        [(eq? prop 'v) (seqV (map (lambda (sym) (noteV (pitV (helper (i-id 'DPIT) env))
                                                                                        (velV  (helper sym env))
                                                                                        (durV  (helper (i-id 'DDUR) env)))) syms))]
-                                        [(eq? prop 'd) (seqV (map (lambda (sym) (noteV (pitchV (helper (i-id 'DPIT) env))
+                                        [(eq? prop 'd) (seqV (map (lambda (sym) (noteV (pitV (helper (i-id 'DPIT) env))
                                                                                        (velV  (helper (i-id 'DVEL) env))
                                                                                        (durV  (helper sym env)))) syms))])]
               [i-fun (arg-name body) (closureV arg-name body env)]

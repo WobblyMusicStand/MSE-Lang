@@ -239,95 +239,117 @@
 (test/exn (run 'h) "")   ;no
 (test (run '0) 0)        ;duh
 
+;test DPIT DVEL DDUR default values
+(test (run 'DPIT) 0)
+(test (run 'DVEL) 0)
+(test (run 'DDUR) 0)
+
+(test (run '{with {DPIT 1} DPIT}) 1)
+(test (run '{with {DVEL 1} DVEL}) 1)
+(test (run '{with {DDUR 1} DDUR}) 1)
+
 
 ;;Notes
 (test (run '{note 1 2 3})
-      (noteV (pitchV 1) (velV 2) (durV 3)))
+      (noteV (pitV 1) (velV 2) (durV 3)))
 
-#;(test (run '{note A1 2 3}) ;note must expect MSE
-        (noteV (pitchV 21) (velV 2) (durV 3)))
+(test (run '{with {a 1} {note a a a}})
+      (noteV (pitV 1) (velV 1) (durV 1)))
+
+(test (run '{note A1 2 3}) ;note must expect MSE
+      (noteV (pitV 21) (velV 2) (durV 3)))
 
 
 
-#;(test/exn (run '{note {note 1 2 3} A1 3})
-            "") ;pitchV expects numbers
+(test/exn (run '{note {note 1 2 3} A1 3})
+          "") ;pitV expects numbers
 
 ;; seqn-xs
 (test (run '(seqn-p C4 C5 C6))
       (seqV (list
-             (noteV (pitchV 48) (velV 10) (durV 10))
-             (noteV (pitchV 60) (velV 10) (durV 10))
-             (noteV (pitchV 72) (velV 10) (durV 10)))))
+             (noteV (pitV 48) (velV 0) (durV 0))
+             (noteV (pitV 60) (velV 0) (durV 0))
+             (noteV (pitV 72) (velV 0) (durV 0)))))
 (test (run '(seqn-v 60 62 73))
       (seqV (list
-             (noteV (pitchV 0) (velV 60) (durV 10))
-             (noteV (pitchV 0) (velV 62) (durV 10))
-             (noteV (pitchV 0) (velV 73) (durV 10)))))
+             (noteV (pitV 0) (velV 60) (durV 0))
+             (noteV (pitV 0) (velV 62) (durV 0))
+             (noteV (pitV 0) (velV 73) (durV 0)))))
 (test (run '(seqn-d 1000 0 100000))
       (seqV (list
-             (noteV (pitchV 0) (velV 10) (durV 1000))
-             (noteV (pitchV 0) (velV 10) (durV 0))
-             (noteV (pitchV 0) (velV 10) (durV 100000)))))
+             (noteV (pitV 0) (velV 0) (durV 1000))
+             (noteV (pitV 0) (velV 0) (durV 0))
+             (noteV (pitV 0) (velV 0) (durV 100000)))))
+
+(test (run '{with {note1 {note 1 1 1}} {sequence note1 note1 note1}})
+      (seqV (list
+             (noteV (pitV 1) (velV 1) (durV 1))
+             (noteV (pitV 1) (velV 1) (durV 1))
+             (noteV (pitV 1) (velV 1) (durV 1)))))
+
+(test/exn (run '{with {note1 {note 1 1 1}} {sequence 1 note1 note1}})
+          "")
+             
 
 ;;changeProps
 (test (run '{changePits {sequence {note 10 20 30}} 40})
-      (seqV (list (noteV (pitchV 40) (velV 20) (durV 30)))))
+      (seqV (list (noteV (pitV 40) (velV 20) (durV 30)))))
 
 (test (run '{changeVels {sequence {note 10 20 30}} 40})
-      (seqV (list (noteV (pitchV 10) (velV 40) (durV 30)))))
+      (seqV (list (noteV (pitV 10) (velV 40) (durV 30)))))
 
 (test (run '{changeDurs {sequence {note 10 20 30}} 40})
-      (seqV (list (noteV (pitchV 10) (velV 20) (durV 40)))))
+      (seqV (list (noteV (pitV 10) (velV 20) (durV 40)))))
 
 
 (test (run '{with {c {sequence {note 10 20 30}}}
                   c})
-      (seqV (list (noteV (pitchV 10) (velV 20) (durV 30)))))
+      (seqV (list (noteV (pitV 10) (velV 20) (durV 30)))))
 
 
 ;;interleave
 (test (run '{interleave {sequence {note 10 20 30} {note 20 20 20}} {sequence {note 30 20 10} {note 30 30 30}}})
       (seqV
        (list
-        (noteV (pitchV 10) (velV 20) (durV 30))
-        (noteV (pitchV 30) (velV 20) (durV 10))
-        (noteV (pitchV 20) (velV 20) (durV 20))
-        (noteV (pitchV 30) (velV 30) (durV 30)))))
+        (noteV (pitV 10) (velV 20) (durV 30))
+        (noteV (pitV 30) (velV 20) (durV 10))
+        (noteV (pitV 20) (velV 20) (durV 20))
+        (noteV (pitV 30) (velV 30) (durV 30)))))
 
 (test (run '(interleave (sequence (note 10 20 30)) (sequence (note 30 20 10) (note 30 30 30))))
-      (seqV (list (noteV (pitchV 10) (velV 20) (durV 30))
-                  (noteV (pitchV 30) (velV 20) (durV 10))
-                  (noteV (pitchV 30) (velV 30) (durV 30)))))
+      (seqV (list (noteV (pitV 10) (velV 20) (durV 30))
+                  (noteV (pitV 30) (velV 20) (durV 10))
+                  (noteV (pitV 30) (velV 30) (durV 30)))))
 
 ;;append
 (test (run '(seq-append (sequence (note 10 20 30) (note 20 20 20)) (sequence (note 30 20 10) (note 30 30 30))))
       (seqV (list
-             (noteV (pitchV 10) (velV 20) (durV 30))
-             (noteV (pitchV 20) (velV 20) (durV 20))
-             (noteV (pitchV 30) (velV 20) (durV 10))
-             (noteV (pitchV 30) (velV 30) (durV 30)))))
+             (noteV (pitV 10) (velV 20) (durV 30))
+             (noteV (pitV 20) (velV 20) (durV 20))
+             (noteV (pitV 30) (velV 20) (durV 10))
+             (noteV (pitV 30) (velV 30) (durV 30)))))
 
 ;;insert
 (test (run '{insert {seqn-p C4 C4} {seqn-p C5 C5} 0})
       (seqV (list
-             (noteV (pitchV 48) (velV 10) (durV 10))
-             (noteV (pitchV 48) (velV 10) (durV 10))
-             (noteV (pitchV 60) (velV 10) (durV 10))
-             (noteV (pitchV 60) (velV 10) (durV 10)))))
+             (noteV (pitV 48) (velV 0) (durV 0))
+             (noteV (pitV 48) (velV 0) (durV 0))
+             (noteV (pitV 60) (velV 0) (durV 0))
+             (noteV (pitV 60) (velV 0) (durV 0)))))
 
 (test (run '{insert {seqn-p C4 C4} into {seqn-p C5 C5} at 1})
       (seqV (list
-             (noteV (pitchV 60) (velV 10) (durV 10))
-             (noteV (pitchV 48) (velV 10) (durV 10))
-             (noteV (pitchV 48) (velV 10) (durV 10))
-             (noteV (pitchV 60) (velV 10) (durV 10)))))
+             (noteV (pitV 60) (velV 0) (durV 0))
+             (noteV (pitV 48) (velV 0) (durV 0))
+             (noteV (pitV 48) (velV 0) (durV 0))
+             (noteV (pitV 60) (velV 0) (durV 0)))))
 
 (test (run '{insert {seqn-p C4 C4} {seqn-p C5 C5} 2})
       (seqV (list
-             (noteV (pitchV 60) (velV 10) (durV 10))
-             (noteV (pitchV 60) (velV 10) (durV 10))
-             (noteV (pitchV 48) (velV 10) (durV 10))
-             (noteV (pitchV 48) (velV 10) (durV 10)))))
+             (noteV (pitV 60) (velV 0) (durV 0))
+             (noteV (pitV 60) (velV 0) (durV 0))
+             (noteV (pitV 48) (velV 0) (durV 0))
+             (noteV (pitV 48) (velV 0) (durV 0)))))
 
 (test/exn (run '{with {i 2} {insert {seqn-p C4 C4} {seqn-p C5 C5} i}})
           "") ;indexes must be provided as numbers, not variables
@@ -335,28 +357,28 @@
 ;;zip
 (test (run '{zip {sequence {note 1 1 1}} {sequence {note 2 2 2}} {sequence {note 3 3 3}}})
       (seqV (list
-             (noteV (pitchV 1) (velV 2) (durV 3)))))
+             (noteV (pitV 1) (velV 2) (durV 3)))))
 
 (test (run '{zip {sequence {note 1 1 1} {note 1 1 1}} {sequence {note 2 2 2} {note 2 2 2}} {sequence {note 3 3 3} {note 3 3 3}}})
       (seqV (list
-             (noteV (pitchV 1) (velV 2) (durV 3))
-             (noteV (pitchV 1) (velV 2) (durV 3)))))
+             (noteV (pitV 1) (velV 2) (durV 3))
+             (noteV (pitV 1) (velV 2) (durV 3)))))
 
 ;;TODO
 (test (run '{zip {sequence {note 1 1 1}} {sequence {note 2 2 2} {note 2 2 2}} {sequence {note 3 3 3} {note 3 3 3}}})
       (seqV (list
-             (noteV (pitchV 1) (velV 2) (durV 3)))))
+             (noteV (pitV 1) (velV 2) (durV 3)))))
 
 (test (run '{zip {seqn-p C4 D4 E4 F4 G4 A4 B4 C5} {seqn-v 40 45 50 55 60 65 70 75} {seqn-d 1000 1000 1000 1000 1000 1000 1000 1000}})
       (seqV (list
-             (noteV (pitchV 48) (velV 40) (durV 1000))
-             (noteV (pitchV 50) (velV 45) (durV 1000))
-             (noteV (pitchV 52) (velV 50) (durV 1000))
-             (noteV (pitchV 53) (velV 55) (durV 1000))
-             (noteV (pitchV 55) (velV 60) (durV 1000))
-             (noteV (pitchV 57) (velV 65) (durV 1000))
-             (noteV (pitchV 59) (velV 70) (durV 1000))
-             (noteV (pitchV 60) (velV 75) (durV 1000)))))
+             (noteV (pitV 48) (velV 40) (durV 1000))
+             (noteV (pitV 50) (velV 45) (durV 1000))
+             (noteV (pitV 52) (velV 50) (durV 1000))
+             (noteV (pitV 53) (velV 55) (durV 1000))
+             (noteV (pitV 55) (velV 60) (durV 1000))
+             (noteV (pitV 57) (velV 65) (durV 1000))
+             (noteV (pitV 59) (velV 70) (durV 1000))
+             (noteV (pitV 60) (velV 75) (durV 1000)))))
 
 ;;A sequence zipped with itself returns a new equivalent sequence
 (test (run '{with {s {seqn-p C4 D4 E4 F4 G4 A4 B4 C5}}
