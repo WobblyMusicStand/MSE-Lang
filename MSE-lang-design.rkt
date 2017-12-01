@@ -64,13 +64,13 @@
   [fun (param symbol?) (body MSE?)]
   [app (function MSE?) (arg MSE?)]
   [interleave (list1 MSE?) (list2 MSE?)]
-  [insert (list1 MSE?) (list2 MSE?) (index num?)]
+  [insert (list1 MSE?) (list2 MSE?) (index MSE?)]
   [transpose (list1 MSE?) (add-val num?)]
   [changePits (list1 MSE?) (val num?)]
   [changeVels (list1 MSE?) (val num?)]
   [changeDurs (list1 MSE?) (val num?)]
   [zip (pList MSE?) (vList MSE?) (dList MSE?)]
-  [markov (seed MSE?) (length num?) (initial-note MSE?)] ; initial-note has to evaluate to a note
+  [markov (seed MSE?) (length MSE?) (initial-note MSE?)] ; initial-note has to evaluate to a note
   )
 
 ;; D-MSE, for interpreter
@@ -88,7 +88,7 @@
   [i-transpose (list1 D-MSE?)(add-val i-num?)]
   [changeProp (prop symbol?) (list1 D-MSE?) (val i-num?)]
   [i-zip (pList D-MSE?) (vList D-MSE?) (dList D-MSE?)]
-  [i-markov (seed D-MSE?)(length i-num?)(initial-note D-MSE?)]
+  [i-markov (seed D-MSE?)(length D-MSE?)(initial-note D-MSE?)]
   )
 
 ;; Interpreting a value returns a Value
@@ -136,10 +136,12 @@
 ;; Returns whether the given input is a symbol and a valid identifier
 (define (valid-id? sym)
   (and (symbol? sym)
-       (and (match (symbol->string sym)
-              [(regexp #rx"[A-G](#|b)*[0-9]+$") false]
-              [else true])
-            (not (member sym *reserved-symbols*)))))
+       (if (and (match (symbol->string sym)
+                  [(regexp #rx"[A-G](#|b)*[0-9]+$") (error "Illegal reserved PitchID in binding:" sym)]
+                  [else true])
+                (not (member sym *reserved-symbols*)))
+           true
+           (error "Illegal reserved ID in binding:" sym))))
 
 ;;parse s-exp -> MSE
 ;;Parses s-exp input and does valid-id checking for binding sites
@@ -159,8 +161,8 @@
      (app (parse f-expr) (parse a-expr))]
     [(list 'interleave list1 list2) (interleave (parse list1) (parse list2))]
     [(list 'interleave list1 into list2) (interleave (parse list1) (parse list2))] ;explicit version of interleave
-    [(list 'insert list1 list2 (? number? index)) (insert (parse list1) (parse list2) (parse index))]
-    [(list 'insert list1 into list2 at (? number? index)) (insert (parse list1) (parse list2) (parse index))] ;explicit version of insert
+    [(list 'insert list1 list2 index) (insert (parse list1) (parse list2) (parse index))]
+    [(list 'insert list1 into list2 at index) (insert (parse list1) (parse list2) (parse index))] ;explicit version of insert
     [(list 'transpose list1 (? number? add-val)) (transpose (parse list1) (parse add-val))]
     [(list 'changePits list1 val) (changePits (parse list1) (parse val))]
     [(list 'changeVels list1 val) (changeVels (parse list1) (parse val))]
@@ -255,11 +257,12 @@
             (type-case MSE-Value m
               [noteV (p v d)  (noteV (pitV (+ (helper val env) (type-case MSE-Value p
                                                                  [pitV (n) n]
-                                                                 [else (error "need a pitch")]))) v d)]
+                                                                 [else (error "Transpose requires a pitch, given: " p)]))) v d)]
               [else (transOne val
                               (type-case MSE-Value (helper m env)
                                 [noteV (p v d) (noteV p v d)]
                                 [else "need a note"]) env)]))
+          ;changeProperty variants
           (define (changeVol val m env)
             (type-case MSE-Value m
               [noteV (p v d)  (noteV p (velV (helper val env)) d)]
@@ -281,7 +284,7 @@
                                (type-case MSE-Value (helper m env)
                                  [noteV (p v d) (noteV p v d)]
                                  [else "need a note"]) env)]))
-          
+          ;insert helper
           (define (doInsert lisS lisD n)
             (cond [(> n (length lisD)) (append lisD lisS)] ;if desination length is smaller then desired index append source to the end of dest
                   [(<= n 0)(append lisS lisD)] ;if index is <0, append destination to the end of source 
@@ -291,8 +294,9 @@
           (define (tolist seq)
             (type-case MSE-Value seq
               [seqV (l) l]
-              [else (error "need a seqV")]))
+              [else (error "Expected a sequence given:" seq)])) ;TODO, replace with false, error handle at call site for more specific errors
           
+          ;interleave helper
           (define (interl lis1 lis2)
             (cond [(empty? lis1) lis2]
                   [(empty? lis2) lis1]
@@ -300,8 +304,8 @@
                               (cons (first lis2)
                                     (interl (rest lis1) (rest lis2))))]))
           
-          ;zip should call map on m elements of each list, where m is the length of the shortes list.
-         
+          ;zip should call map on m elements of each list, where m is the length of the shortest list.
+          ;zip helper
           (define (shorten pL vL dL) (local [(define-values (lpL lvL ldL) (values (length pL) (length vL) (length dL)))
                                              (define-values (shortestL) (if (< lpL lvL) ;pitch < vel?
                                                                             (if (< lpL ldL) ;pitch < dur?
@@ -316,7 +320,51 @@
                                                    (take vL shortestL)
                                                    (take dL shortestL)))))
           
-          ;(define (markovlist ...)) TODO
+          (define (markovWithNote seed n init)
+            (local [(define-values (seed-hash) (make-hash)) ;the mutable strong-keyed hash table
+
+                    ;gets a pair at the current index, key is the current value, value is the next value (or an empty pair if current/next are out of bounds)
+                    (define (getpair lst n) (cons (noteV-pit (list-ref lst n)) ;key, accesses noteV-pit field of key note
+                                                  (if (>= (add1 n) (length lst)) ;value
+                                                      (list (first lst)) ;last element implicitly follows first (option?)
+                                                      (list (list-ref lst (add1 n))))))    
+                    ;prepares a list of key-value pairs to be put into the seed-hash
+                    (define (prepEntries lst) (local [(define (helper lst n)
+                                                        (if (>= n (length lst))
+                                                            empty
+                                                            (local [(define-values (current-pair) (getpair lst n))]
+                                                              (cons current-pair (helper lst (add1 n))))))]
+                                                (helper lst 0)))
+                    ;Fills the seed-hash with key-values pairs found in the seed list.
+                    ;each pair is the key followed by a list of values, each values is found immediatly after the key value in the seed list.
+                    (define (sethash entries) (for-each (lambda (k-v-pair)
+                                                          (local [(define-values (current-vals) (hash-ref seed-hash (car k-v-pair) false))] ;if the current key has a value, append new value to old and re-set, otherwise create new entry
+                                                            (if current-vals
+                                                                (hash-set! seed-hash (car k-v-pair) (append current-vals (cdr k-v-pair)))
+                                                                (hash-set! seed-hash (car k-v-pair) (cdr k-v-pair)))))
+                                                        entries))
+          
+          
+                    ;selects a values from the list of values stored with a key. will return false if the list does not exist, or is empty
+                    (define (select lst) (if (and lst (positive? (length lst))) ;;add support for 0 length lists, DONE                                   
+                                             (list-ref lst (random (length lst))) ;TODO, seed random to set values by default, desable with optional flag
+                                             false))
+                    ;selects the next id from the list of values for a particular key id
+                    (define (getnext id) (select (hash-ref seed-hash id false)))          
+                    ;recurssively builds a list of values using an initial key found in the seed-hash and returns it
+                    (define (buildlist n id) (local [(define-values (next) (getnext (noteV-pit id)))]
+                                               (if (and next (> n 0))
+                                                   (cons next
+                                                         (buildlist (sub1 n) next))
+                                                   empty)))] ;;not (empty) because that is a procedure application.
+    
+              ;Create the hash table for the markov chain
+              (sethash (prepEntries seed))
+    
+              ;return the seed-hash and the resulting list
+              (buildlist n init)))
+
+          ;inter helper, the BBEG itself
           (define (helper expr env)
             (type-case D-MSE expr
               [i-num (n) n]
@@ -332,17 +380,17 @@
               [i-sequence (vals) (seqV (map (lambda (exp) (local [(define-values (pnote) (helper exp env))]
                                                             (if (noteV? pnote)
                                                                 pnote
-                                                                (error "sequence requires noteV, given:" pnote)))) vals))]
+                                                                (error "Sequence requires note, given:" pnote)))) vals))]
               ;prop selects the field to bind the values into
               [i-seqn (prop syms) (cond [(eq? prop 'p) (seqV (map (lambda (sym) (noteV (pitV (helper sym env))
-                                                                                       (velV  (helper (i-id 'DVEL) env))
-                                                                                       (durV  (helper (i-id 'DDUR) env)))) syms))]
+                                                                                       (velV (helper (i-id 'DVEL) env))
+                                                                                       (durV (helper (i-id 'DDUR) env)))) syms))]
                                         [(eq? prop 'v) (seqV (map (lambda (sym) (noteV (pitV (helper (i-id 'DPIT) env))
-                                                                                       (velV  (helper sym env))
-                                                                                       (durV  (helper (i-id 'DDUR) env)))) syms))]
+                                                                                       (velV (helper sym env))
+                                                                                       (durV (helper (i-id 'DDUR) env)))) syms))]
                                         [(eq? prop 'd) (seqV (map (lambda (sym) (noteV (pitV (helper (i-id 'DPIT) env))
-                                                                                       (velV  (helper (i-id 'DVEL) env))
-                                                                                       (durV  (helper sym env)))) syms))])]
+                                                                                       (velV (helper (i-id 'DVEL) env))
+                                                                                       (durV (helper sym env)))) syms))])]
               [i-fun (arg-name body) (closureV arg-name body env)]
               [i-app (fun-expr arg-expr)
                      (local ([define fun-val (helper fun-expr env)]
@@ -364,9 +412,23 @@
                                                       (noteV-vel v) ;vels from the 2nd
                                                       (noteV-dur d))) ;durs from the 3rd
                                              spL svL sdL)))]
-              ;[i-markov ...] TODO
-              [else "NO!!!"]))]
-    ;Trampoline into interp, set the defualt Pitch, Velocity and Duration to O unless overridden
+              [i-markov (seed length inote)(local [(define seedlist (tolist (helper seed env)))
+                                                   (define init (noteV (pitV (helper inote env))
+                                                                       (velV (helper (i-id 'DVEL) env))
+                                                                       (durV (helper (i-id 'DVEL) env))))                                                                             
+                                                   (define n (helper length env))]
+                                             (if (and seedlist init (number? n))
+                                                 (local [(define result (markovWithNote seedlist n init))]
+                                                   (if (empty? result)
+                                                       (error "Bad starting note in markov, no mappings" inote)
+                                                       (seqV result)))
+                                                 (error "Malformed markov with length:" n)))]
+              ;return a list of notes, each note is a note from seed.
+              ;the result is length notes long and starts at inote.
+              
+              ;[else "NO!!!"]
+              ))]
+    ;Trampoline into interp, set the defualt Pitch, Velocity and Duration to O (unless overridden)
     (helper d-mse (anEnv 'DPIT 0 (anEnv 'DVEL 0 (anEnv 'DDUR 0 (mtEnv)))))))
 
 

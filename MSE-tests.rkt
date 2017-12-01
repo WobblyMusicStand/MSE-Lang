@@ -28,34 +28,34 @@
 
 
 ;binding:
-(test/exn (parse '{with {note 1} 1}) "")
-(test/exn (parse '{with {sequence 1} 1}) "")
-(test/exn (parse '{with {seqn-p 1} 1}) "")
-(test/exn (parse '{with {seqn-v 1} 1}) "")
-(test/exn (parse '{with {seqn-d 1} 1}) "")
-(test/exn (parse '{with {seq-append 1} 1}) "")
-(test/exn (parse '{with {with 1} 1}) "")
-(test/exn (parse '{with {fun 1} 1}) "")
-(test/exn (parse '{with {interleave 1} 1}) "")
-(test/exn (parse '{with {insert 1} 1}) "")
-(test/exn (parse '{with {transpose 1} 1}) "")
-(test/exn (parse '{with {changePits 1} 1}) "")
-(test/exn (parse '{with {changeVels 1} 1}) "")
-(test/exn (parse '{with {changeDurs 1} 1}) "")
-(test/exn (parse '{with {markov 1} 1}) "")
+(test/exn (parse '{with {note 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {sequence 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {seqn-p 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {seqn-v 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {seqn-d 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {seq-append 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {with 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {fun 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {interleave 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {insert 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {transpose 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {changePits 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {changeVels 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {changeDurs 1} 1}) "Illegal reserved ID")
+(test/exn (parse '{with {markov 1} 1}) "Illegal reserved ID")
 ;pitches
-(test/exn (parse '{with {A4 1} 1}) "")
-(test/exn (parse '{with {B4 1} 1}) "")
-(test/exn (parse '{with {C4 1} 1}) "")
-(test/exn (parse '{with {D4 1} 1}) "")
-(test/exn (parse '{with {E4 1} 1}) "")
-(test/exn (parse '{with {F4 1} 1}) "")
-(test/exn (parse '{with {G4 1} 1}) "")
-(test/exn (parse '{with {Cb4 1} 1}) "")
-(test/exn (parse '{with {C#4 1} 1}) "")
-(test/exn (parse '{with {Cbb4 1} 1}) "")
-(test/exn (parse '{with {C##4 1} 1}) "")
-(test/exn (parse '{with {C10000 1} 1}) "")
+(test/exn (parse '{with {A4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {B4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {C4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {D4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {E4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {F4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {G4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {Cb4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {C#4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {Cbb4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {C##4 1} 1}) "Illegal reserved PitchID")
+(test/exn (parse '{with {C10000 1} 1}) "Illegal reserved PitchID")
 (test (parse '{with {Dg4 1} 1}) (with 'Dg4 (num 1) (num 1))) ;go right ahead with your malformed ids
 
 
@@ -234,10 +234,10 @@
 (test (run 'C#b4) 48)
 (test (run 'Cbbbbbbbbbbbb4) 36)
 
-(test/exn (run 'B-1) "") ;out of range
-(test/exn (run 'C) "")   ;no octave
-(test/exn (run 'Cg5) "") ;incorrect b/# symbol
-(test/exn (run 'h) "")   ;no
+(test/exn (run 'B-1) "free identifier") ;out of range
+(test/exn (run 'C) "free identifier")   ;no octave
+(test/exn (run 'Cg5) "free identifier") ;incorrect b/# symbol
+(test/exn (run 'h) "free identifier")   ;no
 (test (run '0) 0)        ;duh
 
 ;test DPIT DVEL DDUR default values
@@ -257,13 +257,13 @@
 (test (run '{with {a 1} {note a a a}})
       (noteV (pitV 1) (velV 1) (durV 1)))
 
-(test (run '{note A1 2 3}) ;note must expect MSE
+(test (run '{note A1 2 3}) ;note must allow MSE for ID dereferencing
       (noteV (pitV 21) (velV 2) (durV 3)))
 
 
 
 (test/exn (run '{note {note 1 2 3} A1 3})
-          "") ;pitV expects numbers
+          "note requires numeric pit, vel, dur; given:") ;pitV expects numbers
 
 ;; seqn-xs
 (test (run '(seqn-p C4 C5 C6))
@@ -289,7 +289,7 @@
              (noteV (pitV 1) (velV 1) (durV 1)))))
 
 (test/exn (run '{with {note1 {note 1 1 1}} {sequence 1 note1 note1}})
-          "")
+          "Sequence requires note, given:")
              
 
 ;;changeProps
@@ -352,9 +352,12 @@
              (noteV (pitV 48) (velV 0) (durV 0))
              (noteV (pitV 48) (velV 0) (durV 0)))))
 
-(test/exn (run '{with {i 2} {insert {seqn-p C4 C4} {seqn-p C5 C5} i}})
-          "") ;indexes must be provided as numbers, not variables
-
+;support indexes as variables
+(test (run '{with {i 2} {insert {seqn-p C4 C4} {seqn-p C5 C5} i}})
+      (seqV (list (noteV (pitV 60) (velV 0) (durV 0))
+                  (noteV (pitV 60) (velV 0) (durV 0))
+                  (noteV (pitV 48) (velV 0) (durV 0))
+                  (noteV (pitV 48) (velV 0) (durV 0)))))
 ;;zip
 (test (run '{zip {sequence {note 1 1 1}} {sequence {note 2 2 2}} {sequence {note 3 3 3}}})
       (seqV (list
@@ -389,4 +392,9 @@
       (run '{seqn-p C4 D4 E4 F4 G4 A4 B4 C5}))
 
 
+(test/exn (run '{markov {seqn-p C4 B3 C4 D4} 11 C6}) "Bad starting note in markov, no mappings")
+(test/exn (run '{markov {seqn-p C4 B3 C4 D4} {note 1 1 1} C4}) "Malformed markov with length:")
+(test/exn (run '{markov {note 1 1 1} 11 C4}) "Expected a sequence given:")
 
+;hard to text explicitly, returns differently each time without seeding markov's random, hard to do w/ reducing usefullness
+(run '{markov {seqn-p C4 B3 C4 D4} 11 C4})
