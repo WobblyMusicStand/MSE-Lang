@@ -4,7 +4,7 @@
 (require "../MSE-lang-design.rkt")
 (require "osc.rkt")
 
-;Using racket osc.rkt by Hogeschool voor de Kunsten Utrecht
+;Using racket osc.rkt by Marc Groenewegen, Daan van Hasselt (2013)
 ;https://github.com/marcdinkum/racket-music
 
 ;post parser -> takes MSE-values and sends osc messages
@@ -44,7 +44,7 @@
                          {with {DDUR 1000}
                                {seqn-p C4 C4 G4 G4 A4 A4 G4 F4 F4 E4 E4 D4 D4 C4 G4 G4 F4 F4 E4 E4 D4 G4 G4 F4 F4 E4 E4 D4 C4 C4 G4 G4 A4 A4 G4 F4 F4 E4 E4 D4 G4 C4}}}))
                                        
-;Happy birthday! Rhythym and all!
+;Happy birthday! Rhythym and all! s
 #;(post-eval (run '{with {DVEL 60 }
                          {with {melody {seqn-p A4 A4 B4 A4 D5 C#5 A4 A4 B4 A4 E5 D5 A4 A4 A5 F#5 D5 C#5 B4 G5 G5 F#5 D5 E5 D5}}
                                {with {rhythym {seqn-d 750 250 1000 1000 1000 2000 750 250 1000 1000 1000 2000 750 250 1000 1000 1000 1000 1000 750 250 1000 1000 1000 2000}}
@@ -63,3 +63,8 @@
                                {with {rhythym {seqn-d 750 250 1000 1000 1000 2000 750 250 1000 1000 1000 2000 750 250 1000 1000 1000 1000 1000 750 250 1000 1000 1000 2000}}
                                      {markov {zip melody melody rhythym} 29 A4}}}}))
 
+;;Twinkle Twinkle but happy birthday rhythms
+(post-eval (run '{with {DVEL 60 }
+                         {with {melody {seqn-p C4 C4 G4 G4 A4 A4 G4 F4 F4 E4 E4 D4 D4 C4 G4 G4 F4 F4 E4 E4 D4 G4 G4 F4 F4 E4 E4 D4 C4 C4 G4 G4 A4 A4 G4 F4 F4 E4 E4 D4 G4 C4}}
+                               {with {rhythym {seqn-d 750 250 1000 1000 1000 2000 750 250 1000 1000 1000 2000 750 250 1000 1000 1000 1000 1000 750 250 1000 1000 1000 2000}}
+                                     {zip melody melody rhythym}}}}))
