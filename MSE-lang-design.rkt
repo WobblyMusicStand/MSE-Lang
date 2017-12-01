@@ -342,21 +342,19 @@
           
           
                     ;selects a values from the list of values stored with a key. will return false if the list does not exist, or is empty
-                    (define (select lst) (if (and lst (positive? (length lst))) ;;add support for 0 length lists, DONE                                   
-                                             (list-ref lst (random (length lst))) ;TODO, seed random to set values by default, desable with optional flag
+                    (define (select lst) (if (and lst (positive? (length lst)))                                   
+                                             (list-ref lst (random (length lst)))
                                              false))
                     ;selects the next id from the list of values for a particular key id
                     (define (getnext id) (select (hash-ref seed-hash id false)))          
-                    ;recurssively builds a list of values using an initial key found in the seed-hash and returns it
+                    ;recursively builds a list of values using an initial key found in the seed-hash and returns it
                     (define (buildlist n id) (local [(define-values (next) (getnext (noteV-pit id)))]
                                                (if (and next (> n 0))
                                                    (cons next
                                                          (buildlist (sub1 n) next))
-                                                   empty)))] ;;not (empty) because that is a procedure application.
-    
+                                                   empty)))]    
               ;Create the hash table for the markov chain
-              (sethash (prepEntries seed))
-    
+              (sethash (prepEntries seed))    
               ;return the seed-hash and the resulting list
               (buildlist n init)))
 

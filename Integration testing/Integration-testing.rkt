@@ -57,5 +57,9 @@
                                                 {zip melody melody rhythym}}}}
                               7}))
 
-
+;Markov birthday? Kinda like happy birthday, but new!
+#;(post-eval (run '{with {DVEL 60 }
+                         {with {melody {seqn-p A4 A4 B4 A4 D5 C#5 A4 A4 B4 A4 E5 D5 A4 A4 A5 F#5 D5 C#5 B4 G5 G5 F#5 D5 E5 D5}}
+                               {with {rhythym {seqn-d 750 250 1000 1000 1000 2000 750 250 1000 1000 1000 2000 750 250 1000 1000 1000 1000 1000 750 250 1000 1000 1000 2000}}
+                                     {markov {zip melody melody rhythym} 29 A4}}}}))
 
