@@ -6,16 +6,6 @@
 ;; ==========================================================
 
 
-;; Sample markov table
-
-;; C B C D
-
-; C | B D
-; B | C
-; D | C ; Implicitly first note follows the last note
-
-; Example : (markov '(C B C D) 11) (C B C D C B C D C B C)
-
 
 ;; MSE = Music Writing Expression
 ;;
@@ -38,6 +28,7 @@
 ;;     | {changePits <MSE> <num>}                   ; change pitches of all notes in the sequence to the given number
 ;;     | {changeVels <MSE> <num>}                   ; change velocities of all notes in the sequence to the given number
 ;;     | {changeDurs <MSE> <num>}                   ; change durations of all notes in the sequence to the given number
+;;     | {retrograde <MSE>}                         ; reverses the order of the contents of a sequence
 ;;     | {zip <MSE> <MSE> <MSE>}                    ; creates a new sequence using the pitches of the 1st, velocity of the 2nd, and duration of the 3rd lists in order of occurance
 ;;     | {markov <MSE> <num> <MSE>?}                ; Runs markov chain (with a depth of 1) as shown in the example above
 
@@ -69,6 +60,7 @@
   [changePits (list1 MSE?) (val num?)]
   [changeVels (list1 MSE?) (val num?)]
   [changeDurs (list1 MSE?) (val num?)]
+  [retrograde (list MSE?)]
   [zip (pList MSE?) (vList MSE?) (dList MSE?)]
   [markov (seed MSE?) (length MSE?) (initial-note MSE?)] ; initial-note has to evaluate to a note
   )
@@ -87,6 +79,7 @@
   [i-insert (list1 D-MSE?)(list2 D-MSE?)(index D-MSE?)]
   [i-transpose (list1 D-MSE?)(add-val i-num?)]
   [changeProp (prop symbol?) (list1 D-MSE?) (val i-num?)]
+  [i-retrograde (list D-MSE?)]
   [i-zip (pList D-MSE?) (vList D-MSE?) (dList D-MSE?)]
   [i-markov (seed D-MSE?)(length D-MSE?)(initial-note D-MSE?)]
   )
@@ -124,6 +117,7 @@
                              changePits
                              changeVels
                              changeDurs
+                             retrograde
                              zip
                              markov)) ; defining what the reserved symbols of the system are
 
@@ -167,6 +161,7 @@
     [(list 'changePits list1 val) (changePits (parse list1) (parse val))]
     [(list 'changeVels list1 val) (changeVels (parse list1) (parse val))]
     [(list 'changeDurs list1 val) (changeDurs (parse list1) (parse val))]
+    [(list 'retrograde list) (retrograde (parse list))]
     [(list 'zip pL vL dL) (zip (parse pL) (parse vL) (parse dL))]
     [(list 'markov seed length initial-note) (markov (parse seed) (parse length) (parse initial-note))]
     [else (error "Illegal Expression")]))
@@ -208,6 +203,7 @@
     [changePits (list1 val) (changeProp 'p (desugar list1) (desugar val))]
     [changeVels (list1 val) (changeProp 'v (desugar list1) (desugar val))]
     [changeDurs (list1 val) (changeProp 'd (desugar list1) (desugar val))]
+    [retrograde (list) (i-retrograde (desugar list))]
     [zip (pL vL dL) (i-zip  (desugar pL) (desugar vL) (desugar dL))]
     [markov (s lth ini)
             (i-markov (desugar s)(desugar lth)(desugar ini))]
@@ -403,6 +399,7 @@
               [changeProp (prop listN value) (cond [(eq? prop 'p) (seqV (map (lambda (m) (changePit value m env)) (tolist (helper listN env))))]
                                                    [(eq? prop 'v) (seqV (map (lambda (m) (changeVol value m env)) (tolist (helper listN env))))]
                                                    [(eq? prop 'd) (seqV (map (lambda (m) (changeDur value m env)) (tolist (helper listN env))))])]
+              [i-retrograde (list) (seqV (reverse (tolist (helper list env))))]
               [i-zip (pL vL dL) (local [(define-values (spL svL sdL) ;Get the first m elements of each list, where m is the length of the shortest list
                                           (shorten (tolist (helper pL env))
                                                    (tolist (helper vL env))

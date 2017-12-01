@@ -307,6 +307,14 @@
                   c})
       (seqV (list (noteV (pitV 10) (velV 20) (durV 30)))))
 
+;;retrograde
+(test (run '{retrograde {seqn-p C4 D4 E4}})
+      (seqV
+       (list
+        (noteV (pitV 52) (velV 0) (durV 0))
+        (noteV (pitV 50) (velV 0) (durV 0))
+        (noteV (pitV 48) (velV 0) (durV 0)))))
+
 
 ;;interleave
 (test (run '{interleave {sequence {note 10 20 30} {note 20 20 20}} {sequence {note 30 20 10} {note 30 30 30}}})
