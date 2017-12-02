@@ -6,7 +6,6 @@
 ;; ==========================================================
 
 
-
 ;; MSE = Music Writing Expression
 ;;
 ;; <MSE> ::= <num>
@@ -29,7 +28,9 @@
 ;;     | {changeVels <MSE> <num>}                   ; change velocities of all notes in the sequence to the given number
 ;;     | {changeDurs <MSE> <num>}                   ; change durations of all notes in the sequence to the given number
 ;;     | {retrograde <MSE>}                         ; reverses the order of the contents of a sequence
-;;     | {zip <MSE> <MSE> <MSE>}                    ; creates a new sequence using the pitches of the 1st, velocity of the 2nd, and duration of the 3rd lists in order of occurance
+;;     | {zip <MSE> <MSE> <MSE>}                    ; creates a new sequence using the pitches of the 1st,
+;;                                                    velocity of the 2nd
+;;                                                    and duration of the 3rd lists in order of occurance
 ;;     | {markov <MSE> <num> <MSE>?}                ; Runs markov chain (with a depth of 1) as shown in the example above
 
 ; Note Message is 3 bytes
