@@ -9,9 +9,8 @@
 ;; MSE = Music Writing Expression
 ;;
 ;; <MSE> ::= <num>
-;;  Proof of Concept Implementation
 ;;     | <id>
-;;     | {note <MSE> <MSE> <MSE>}
+;;     | {note <MSE> <num> <num>}
 ;;     | {sequence <MSE>*}
 ;;     | {seqn-p <MSE>*}                            ; A list of given notes in letter format (e.g. A4 E5)
 ;;     | {seqn-v <MSE>*}                            ; A list of notes' velocities
@@ -21,7 +20,6 @@
 ;;     | {with {<id> <MSE>} <MSE>}     
 ;;     | {fun {<id> <MSE>} <MSE>}
 ;;     | {<MSE> <MSE> }                             ; function calls, any time the first symbol is not a reserved word
-;;
 ;;     | {interleave <MSE> into <MSE>}              ; Takes first element of 1st MSE, appends to 1st element of 2nd MSE ... 
 ;;     | {insert <MSE> in <MSE> at <num>}           ; Inserts MSE in MSE at index number
 ;;     | {transpose <MSE> <num>}                    ; Takes a sequence of notes and a number, and
@@ -34,48 +32,6 @@
 ;;                                                    velocity of the 2nd
 ;;                                                    and duration of the 3rd lists in order of occurance
 ;;     | {markov <MSE> <num> <MSE>?}                ; Runs markov chain (with a depth of 1) as shown in the example above
-;;
-
-
-;;  For long-term only:
-;;     | {polyphony <MSE>*}                         ; like sequence, but all elements start at the same time
-;;                                                  ;  Markov: unsure how to support, TODO
-;;                                                  ;  Zip: unsure how to support, TODO
-;;
-;;     | {adjust-vel <MSE> <num>}                   ; Takes a sequence of notes and a number, and
-;;                                                    adds that number to the velocity of all notes in the sequence
-;;     | {extend-dur <MSE> <num>}                   ; Takes a sequence of notes and a number, and
-;;                                                    adds that number to the duration of all notes in the sequence
-;;
-;;     | {invert-pitch <MSE> <num>}    ; Takes a sequence and a pitch-axis and inverts the
-;;                                       existing pitches around that pitch-axis
-;;                                       Ex {invert-pitch {seqn-p 0 2} 4} => {seqn-p 8 6}
-;;     | {expand <MSE> <num> <id>}     ; Takes a sequence and a magnitude and a target-parameter flag.
-;;                                       Multiplies the target parameter (pitch, vel, dur) by the magnitude
-;;
-;;  Long-term MIDI-Ready features:
-;;    focus is on export compatability and formating, support for these features may require adjustments to existing constructs/functions
-;;
-;;
-;;     | {set-channel <MSE> <num>}                  ; Takes an sequence and an channel-number,
-;;                                                    binds the sequence to the channel id for use when exporting.
-;;     | {set-instrument <MSE> <num>}               ; Takes and Sequence and an insturment, binds that sequence to the instrument.
-;;     | {tempo <MSE> <id>}                         ; Takes an Sequence and a number of beats per minute, bpm.
-;;                                                    Binds the sequence the tempo for all beats within
-;;     | {time-sig <MSE> <id>}                      ; Works in cunjunction with tempo, specifies the number of beats
-;;                                                    per bar and their type for the bound sequence
-;;     | {key-sig <MSE> <id>}                       ; Binds the sequence with a key-signature flag, specifies which notes to interpret
-;;                                                    as accidentals when exported to a human-readable format
-;;     | {clef <MSE> <id>}                          ; Binds the sequence to a given clef.
-;;     | {export <MSE>}                             ; Takes an evaluated MSE, and exports it into a MIDI readable binary file.
-;;                                                     Uses a post-evaluation parser. VERY LONG TERM
-;;                                                     May have a number of export flags, such as instrument, channel, 
-;;                                                     Yamaha/Roland style pitch-indexing (slightly different +-12)
-;;                                                     to use if not specified by the program
-
-
-;;  TODO, long term more generative functions
-;;        recurssion.
 
 ; Note Message is 3 bytes
 ; Pitch (0 - 127)
@@ -135,23 +91,8 @@
   [pitV (pit number?)]
   [velV (vel number?)]
   [durV (dur number?)]
-  [noteV (pit pitV?)
-         (vel velV?)
-         (dur durV?)]
-  [seqV (clef symbol?)
-        (key symbol?)
-        (time-sig symbol?)
-        (tempo number?)
-        (instrument number?)
-        (channel number?)
-        (values (and/c (listof MSE-Value?) (not/c empty?)))] ;;Distributions must not be empty, nesting allower
-  [polyV (clef symbol?)
-         (key symbol?)
-         (time-sig symbol?)
-         (tempo number?)
-         (instrument number?)
-         (channel number?)
-         (values (and/c (listof MSE-Value?) (not/c empty?)))]
+  [noteV (pit pitV?) (vel velV?) (dur durV?)]
+  [seqV (values (and/c (listof noteV?) (not/c empty?)))] ;no nested sequences
   [closureV (param symbol?)  ;;Closures wrap an unevaluated function body with its parameter and environment
             (body D-MSE?)
             (env Env?)])
@@ -340,7 +281,6 @@
                                (type-case MSE-Value (helper m env)
                                  [noteV (p v d) (noteV p v d)]
                                  [else "need a note"]) env)]))
-                                 
           ;insert helper
           (define (doInsert lisS lisD n)
             (cond [(> n (length lisD)) (append lisD lisS)] ;if desination length is smaller then desired index append source to the end of dest
